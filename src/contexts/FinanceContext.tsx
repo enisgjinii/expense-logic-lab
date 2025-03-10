@@ -12,6 +12,20 @@ import {
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  deleteDoc,
+  updateDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   // This would be filled with your Firebase config
@@ -26,6 +40,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -36,6 +51,7 @@ interface FinanceContextType {
   isLoading: boolean;
   isAuthLoading: boolean;
   importCSV: (csvContent: string) => void;
+  addTransaction: (transaction: Transaction) => Promise<void>;
   clearData: () => void;
   addBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => void;
@@ -76,48 +92,113 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribe();
   }, []);
 
-  // Load data from localStorage on initial render
+  // Load data from Firebase or localStorage based on authentication state
   useEffect(() => {
-    const savedData = localStorage.getItem('financeTrackerData');
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-        setTransactions(parsedData);
-        setStats(calculateDashboardStats(parsedData));
-      } catch (error) {
-        console.error('Error loading saved data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load saved data",
-          variant: "destructive"
-        });
+    if (user) {
+      // User is logged in, fetch from Firebase
+      fetchTransactionsFromFirebase();
+      fetchBudgetsFromFirebase();
+    } else {
+      // User is not logged in, load from localStorage
+      const savedData = localStorage.getItem('financeTrackerData');
+      if (savedData) {
+        try {
+          const parsedData = JSON.parse(savedData);
+          setTransactions(parsedData);
+          setStats(calculateDashboardStats(parsedData));
+        } catch (error) {
+          console.error('Error loading saved data:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load saved data",
+            variant: "destructive"
+          });
+        }
       }
-    }
 
-    // Load budgets
-    const savedBudgets = localStorage.getItem('financeTrackerBudgets');
-    if (savedBudgets) {
-      try {
-        const parsedBudgets = JSON.parse(savedBudgets);
-        setBudgets(parsedBudgets);
-      } catch (error) {
-        console.error('Error loading saved budgets:', error);
+      // Load budgets
+      const savedBudgets = localStorage.getItem('financeTrackerBudgets');
+      if (savedBudgets) {
+        try {
+          const parsedBudgets = JSON.parse(savedBudgets);
+          setBudgets(parsedBudgets);
+        } catch (error) {
+          console.error('Error loading saved budgets:', error);
+        }
       }
     }
-  }, []);
+  }, [user]);
+
+  // Fetch transactions from Firebase
+  const fetchTransactionsFromFirebase = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+      const querySnapshot = await getDocs(transactionsRef);
+      
+      const fetchedTransactions: Transaction[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedTransactions.push({ id: doc.id, ...doc.data() } as Transaction);
+      });
+      
+      setTransactions(fetchedTransactions);
+      setStats(calculateDashboardStats(fetchedTransactions));
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load transactions from Firebase",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch budgets from Firebase
+  const fetchBudgetsFromFirebase = async () => {
+    if (!user) return;
+    
+    try {
+      const budgetsRef = collection(db, 'users', user.uid, 'budgets');
+      const querySnapshot = await getDocs(budgetsRef);
+      
+      const fetchedBudgets: Budget[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedBudgets.push({ id: doc.id, ...doc.data() } as Budget);
+      });
+      
+      setBudgets(fetchedBudgets);
+    } catch (error) {
+      console.error('Error fetching budgets:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load budgets from Firebase",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Update localStorage and stats whenever transactions change
   useEffect(() => {
     if (transactions.length > 0) {
-      localStorage.setItem('financeTrackerData', JSON.stringify(transactions));
+      // Only save to localStorage if user is not logged in
+      if (!user) {
+        localStorage.setItem('financeTrackerData', JSON.stringify(transactions));
+      }
       setStats(calculateDashboardStats(transactions));
     }
-  }, [transactions]);
+  }, [transactions, user]);
 
   // Update localStorage whenever budgets change
   useEffect(() => {
-    localStorage.setItem('financeTrackerBudgets', JSON.stringify(budgets));
-  }, [budgets]);
+    // Only save to localStorage if user is not logged in
+    if (!user) {
+      localStorage.setItem('financeTrackerBudgets', JSON.stringify(budgets));
+    }
+  }, [budgets, user]);
 
   // Calculate budget summaries when transactions or budgets change
   useEffect(() => {
@@ -170,7 +251,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBudgetSummaries(newBudgetSummaries);
   }, [transactions, budgets]);
 
-  const importCSV = (csvContent: string) => {
+  const importCSV = async (csvContent: string) => {
     setIsLoading(true);
     try {
       const newTransactions = parseCSV(csvContent);
@@ -184,10 +265,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
       
-      setTransactions(prev => {
-        const combined = [...prev, ...newTransactions];
-        return combined;
-      });
+      if (user) {
+        // User is logged in, save to Firebase
+        await saveTransactionsToFirebase(newTransactions);
+        await fetchTransactionsFromFirebase(); // Refresh the transactions
+      } else {
+        // User is not logged in, save to localStorage
+        setTransactions(prev => {
+          const combined = [...prev, ...newTransactions];
+          return combined;
+        });
+      }
       
       toast({
         title: "Import Successful",
@@ -205,43 +293,203 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const clearData = () => {
-    setTransactions([]);
-    setBudgets([]);
-    setStats(initialStats);
-    localStorage.removeItem('financeTrackerData');
-    localStorage.removeItem('financeTrackerBudgets');
-    toast({
-      title: "Data Cleared",
-      description: "All financial data has been removed",
-    });
-  };
-
-  const addBudget = (budget: Budget) => {
-    // Check if budget for this category already exists
-    const existingIndex = budgets.findIndex(b => b.category === budget.category);
+  // Save transactions to Firebase
+  const saveTransactionsToFirebase = async (newTransactions: Transaction[]) => {
+    if (!user) return;
     
-    if (existingIndex >= 0) {
-      // Update existing budget
-      const updatedBudgets = [...budgets];
-      updatedBudgets[existingIndex] = budget;
-      setBudgets(updatedBudgets);
-      toast({
-        title: "Budget Updated",
-        description: `Updated budget for ${budget.category}`,
+    try {
+      const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+      
+      // Save each transaction to Firebase
+      const promises = newTransactions.map(async (transaction) => {
+        await setDoc(doc(transactionsRef, transaction.id), {
+          ...transaction,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
       });
-    } else {
-      // Add new budget
-      setBudgets(prev => [...prev, budget]);
+      
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error saving transactions to Firebase:', error);
+      throw error;
     }
   };
 
-  const deleteBudget = (id: string) => {
-    setBudgets(prev => prev.filter(budget => budget.id !== id));
-    toast({
-      title: "Budget Removed",
-      description: "Budget has been deleted",
-    });
+  // Add a single transaction
+  const addTransaction = async (transaction: Transaction) => {
+    try {
+      if (user) {
+        // User is logged in, save to Firebase
+        const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+        await setDoc(doc(transactionsRef, transaction.id), {
+          ...transaction,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        
+        // Refresh transactions
+        await fetchTransactionsFromFirebase();
+      } else {
+        // User is not logged in, save to localStorage
+        setTransactions(prev => [...prev, transaction]);
+      }
+      
+      toast({
+        title: "Transaction Added",
+        description: "Your transaction has been successfully added",
+      });
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add transaction",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const clearData = async () => {
+    if (user) {
+      // User is logged in, clear from Firebase
+      try {
+        setIsLoading(true);
+        const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+        const budgetsRef = collection(db, 'users', user.uid, 'budgets');
+        
+        // Get all transactions
+        const transactionsSnapshot = await getDocs(transactionsRef);
+        const transactionPromises = transactionsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        
+        // Get all budgets
+        const budgetsSnapshot = await getDocs(budgetsRef);
+        const budgetPromises = budgetsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        
+        // Execute all deletes
+        await Promise.all([...transactionPromises, ...budgetPromises]);
+        
+        // Refresh the data
+        setTransactions([]);
+        setBudgets([]);
+        setStats(initialStats);
+        
+        toast({
+          title: "Data Cleared",
+          description: "All financial data has been removed from Firebase",
+        });
+      } catch (error) {
+        console.error('Error clearing Firebase data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to clear data from Firebase",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // User is not logged in, clear localStorage
+      setTransactions([]);
+      setBudgets([]);
+      setStats(initialStats);
+      localStorage.removeItem('financeTrackerData');
+      localStorage.removeItem('financeTrackerBudgets');
+      toast({
+        title: "Data Cleared",
+        description: "All financial data has been removed",
+      });
+    }
+  };
+
+  const addBudget = async (budget: Budget) => {
+    try {
+      if (user) {
+        // User is logged in, save to Firebase
+        const budgetsRef = collection(db, 'users', user.uid, 'budgets');
+        
+        // Check if budget for this category already exists
+        const q = query(budgetsRef, where("category", "==", budget.category));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          // Update existing budget
+          const docRef = querySnapshot.docs[0].ref;
+          await updateDoc(docRef, {
+            ...budget,
+            updatedAt: serverTimestamp()
+          });
+        } else {
+          // Add new budget
+          await setDoc(doc(budgetsRef, budget.id), {
+            ...budget,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        }
+        
+        // Refresh budgets
+        await fetchBudgetsFromFirebase();
+        
+        toast({
+          title: "Budget Updated",
+          description: `Updated budget for ${budget.category}`,
+        });
+      } else {
+        // User is not logged in, save to localStorage
+        // Check if budget for this category already exists
+        const existingIndex = budgets.findIndex(b => b.category === budget.category);
+        
+        if (existingIndex >= 0) {
+          // Update existing budget
+          const updatedBudgets = [...budgets];
+          updatedBudgets[existingIndex] = budget;
+          setBudgets(updatedBudgets);
+          toast({
+            title: "Budget Updated",
+            description: `Updated budget for ${budget.category}`,
+          });
+        } else {
+          // Add new budget
+          setBudgets(prev => [...prev, budget]);
+        }
+      }
+    } catch (error) {
+      console.error('Error adding/updating budget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update budget",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteBudget = async (id: string) => {
+    try {
+      if (user) {
+        // User is logged in, delete from Firebase
+        const budgetRef = doc(db, 'users', user.uid, 'budgets', id);
+        await deleteDoc(budgetRef);
+        
+        // Refresh budgets
+        await fetchBudgetsFromFirebase();
+      } else {
+        // User is not logged in, delete from localStorage
+        setBudgets(prev => prev.filter(budget => budget.id !== id));
+      }
+      
+      toast({
+        title: "Budget Removed",
+        description: "Budget has been deleted",
+      });
+    } catch (error) {
+      console.error('Error deleting budget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete budget",
+        variant: "destructive"
+      });
+    }
   };
 
   // Authentication functions
@@ -288,6 +536,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         title: "Signed Out",
         description: "You have been signed out",
       });
+      
+      // Clear in-memory data when logging out
+      setTransactions([]);
+      setBudgets([]);
+      setStats(initialStats);
     } catch (error: any) {
       console.error('Error signing out:', error);
       toast({
@@ -309,6 +562,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isLoading,
       isAuthLoading,
       importCSV, 
+      addTransaction,
       clearData,
       addBudget,
       deleteBudget,
