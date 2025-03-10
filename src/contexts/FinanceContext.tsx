@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Transaction, DashboardStats, Budget, BudgetSummary } from '@/types/finance';
 import { parseCSV, calculateDashboardStats } from '@/utils/finance-utils';
 import { toast } from '@/components/ui/use-toast';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, FirebaseApp } from 'firebase/app';
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -27,20 +27,55 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 
-const firebaseConfig = {
-  // This would be filled with your Firebase config
-  apiKey: "AIzaSyBl83QJGd2xdamHmfgC4jhxW3nIxFkm9Q0",
-  authDomain: "channelanalyzer-f8b10.firebaseapp.com",
-  projectId: "channelanalyzer-f8b10",
-  storageBucket: "channelanalyzer-f8b10.firebasestorage.app",
-  messagingSenderId: "368302555628",
-  appId: "1:368302555628:web:f63747c8831ae916dd80c9"
+interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+}
+
+// Get Firebase config from localStorage or use default
+const getFirebaseConfig = (): FirebaseConfig => {
+  const savedConfig = localStorage.getItem('firebaseConfig');
+  if (savedConfig) {
+    try {
+      return JSON.parse(savedConfig);
+    } catch (error) {
+      console.error('Error parsing saved Firebase config:', error);
+    }
+  }
+  
+  // Default config (can be empty or with placeholder values)
+  return {
+    apiKey: "AIzaSyBl83QJGd2xdamHmfgC4jhxW3nIxFkm9Q0",
+    authDomain: "channelanalyzer-f8b10.firebaseapp.com",
+    projectId: "channelanalyzer-f8b10",
+    storageBucket: "channelanalyzer-f8b10.firebasestorage.app",
+    messagingSenderId: "368302555628",
+    appId: "1:368302555628:web:f63747c8831ae916dd80c9"
+  };
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase with config from localStorage or default
+let firebaseConfig = getFirebaseConfig();
+let app: FirebaseApp;
+let auth: ReturnType<typeof getAuth>;
+let db: ReturnType<typeof getFirestore>;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  console.error('Error initializing Firebase:', error);
+  toast({
+    title: "Firebase Error",
+    description: "Failed to initialize Firebase. Please check your configuration.",
+    variant: "destructive"
+  });
+}
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -52,12 +87,15 @@ interface FinanceContextType {
   isAuthLoading: boolean;
   importCSV: (csvContent: string) => void;
   addTransaction: (transaction: Transaction) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  updateTransaction: (transaction: Transaction) => Promise<void>;
   clearData: () => void;
   addBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateFirebaseConfig: (config: FirebaseConfig) => Promise<void>;
 }
 
 const initialStats: DashboardStats = {
@@ -350,6 +388,71 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Delete a transaction
+  const deleteTransaction = async (id: string) => {
+    try {
+      if (user) {
+        // User is logged in, delete from Firebase
+        const transactionRef = doc(db, 'users', user.uid, 'transactions', id);
+        await deleteDoc(transactionRef);
+        
+        // Refresh transactions
+        await fetchTransactionsFromFirebase();
+      } else {
+        // User is not logged in, delete from localStorage
+        setTransactions(prev => prev.filter(transaction => transaction.id !== id));
+      }
+      
+      toast({
+        title: "Transaction Deleted",
+        description: "Transaction has been successfully removed",
+      });
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  // Update a transaction
+  const updateTransaction = async (transaction: Transaction) => {
+    try {
+      if (user) {
+        // User is logged in, update in Firebase
+        const transactionRef = doc(db, 'users', user.uid, 'transactions', transaction.id);
+        await updateDoc(transactionRef, {
+          ...transaction,
+          updatedAt: serverTimestamp()
+        });
+        
+        // Refresh transactions
+        await fetchTransactionsFromFirebase();
+      } else {
+        // User is not logged in, update in localStorage
+        setTransactions(prev => 
+          prev.map(t => t.id === transaction.id ? transaction : t)
+        );
+      }
+      
+      toast({
+        title: "Transaction Updated",
+        description: "Transaction has been successfully updated",
+      });
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update transaction",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const clearData = async () => {
     if (user) {
       // User is logged in, clear from Firebase
@@ -492,6 +595,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Update Firebase configuration
+  const updateFirebaseConfig = async (config: FirebaseConfig) => {
+    try {
+      // Store the new config in localStorage
+      localStorage.setItem('firebaseConfig', JSON.stringify(config));
+      
+      // Reinitialize Firebase with the new config
+      // Note: This is a bit hacky and might not fully work without a page refresh
+      // A full app restart is generally recommended after changing Firebase config
+      try {
+        const newApp = initializeApp(config, 'updated-app');
+        auth = getAuth(newApp);
+        db = getFirestore(newApp);
+      } catch (error) {
+        console.error('Error reinitializing Firebase with new config:', error);
+        toast({
+          title: "Warning",
+          description: "Firebase configuration updated, but you'll need to refresh the page for changes to take effect",
+        });
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating Firebase config:', error);
+      throw error;
+    }
+  };
+
   // Authentication functions
   const signIn = async (email: string, password: string) => {
     try {
@@ -563,12 +694,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isAuthLoading,
       importCSV, 
       addTransaction,
+      deleteTransaction,
+      updateTransaction,
       clearData,
       addBudget,
       deleteBudget,
       signIn,
       signUp,
-      logout
+      logout,
+      updateFirebaseConfig
     }}>
       {children}
     </FinanceContext.Provider>
