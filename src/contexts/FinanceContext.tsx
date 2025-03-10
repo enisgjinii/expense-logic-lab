@@ -1,43 +1,38 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Transaction, DashboardStats, Budget, BudgetSummary } from '@/types/finance';
-import { parseCSV, calculateDashboardStats } from '@/utils/finance-utils';
+import { parseXLS, calculateDashboardStats } from '@/utils/finance-utils';
 import { toast } from '@/components/ui/use-toast';
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User as FirebaseUser
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
+import {
+  getFirestore,
+  collection,
+  setDoc,
+  getDocs,
+  query,
+  where,
   deleteDoc,
   updateDoc,
+  doc,
   serverTimestamp
 } from 'firebase/firestore';
 
 const firebaseConfig = {
-  // This would be filled with your Firebase config
-  apiKey: "AIzaSyBl83QJGd2xdamHmfgC4jhxW3nIxFkm9Q0",
-  authDomain: "channelanalyzer-f8b10.firebaseapp.com",
-  projectId: "channelanalyzer-f8b10",
-  storageBucket: "channelanalyzer-f8b10.firebasestorage.app",
-  messagingSenderId: "368302555628",
-  appId: "1:368302555628:web:f63747c8831ae916dd80c9"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -50,11 +45,15 @@ interface FinanceContextType {
   user: FirebaseUser | null;
   isLoading: boolean;
   isAuthLoading: boolean;
-  importCSV: (csvContent: string) => void;
+  importXLS: (file: File) => void;
   addTransaction: (transaction: Transaction) => Promise<void>;
+  updateTransaction: (transaction: Transaction) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   clearData: () => void;
   addBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => void;
+  refreshData: () => Promise<void>;
+  exportData: () => string;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -81,226 +80,163 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
-  // Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setIsAuthLoading(false);
     });
-
-    // Cleanup subscription
     return () => unsubscribe();
   }, []);
 
-  // Load data from Firebase or localStorage based on authentication state
   useEffect(() => {
     if (user) {
-      // User is logged in, fetch from Firebase
       fetchTransactionsFromFirebase();
       fetchBudgetsFromFirebase();
     } else {
-      // User is not logged in, load from localStorage
-      const savedData = localStorage.getItem('financeTrackerData');
+      const savedData = localStorage.getItem(`${import.meta.env.VITE_LOCAL_STORAGE_PREFIX || 'financeTracker'}Data`);
       if (savedData) {
         try {
           const parsedData = JSON.parse(savedData);
           setTransactions(parsedData);
           setStats(calculateDashboardStats(parsedData));
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error loading saved data:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load saved data",
-            variant: "destructive"
-          });
+          toast({ title: "Error", description: "Failed to load saved data: " + error.message, variant: "destructive" });
         }
       }
-
-      // Load budgets
-      const savedBudgets = localStorage.getItem('financeTrackerBudgets');
+      const savedBudgets = localStorage.getItem(`${import.meta.env.VITE_LOCAL_STORAGE_PREFIX || 'financeTracker'}Budgets`);
       if (savedBudgets) {
         try {
           const parsedBudgets = JSON.parse(savedBudgets);
           setBudgets(parsedBudgets);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error loading saved budgets:', error);
+          toast({ title: "Error", description: "Failed to load saved budgets: " + error.message, variant: "destructive" });
         }
       }
     }
   }, [user]);
 
-  // Fetch transactions from Firebase
   const fetchTransactionsFromFirebase = async () => {
     if (!user) return;
-    
     setIsLoading(true);
     try {
       const transactionsRef = collection(db, 'users', user.uid, 'transactions');
       const querySnapshot = await getDocs(transactionsRef);
-      
       const fetchedTransactions: Transaction[] = [];
       querySnapshot.forEach((doc) => {
         fetchedTransactions.push({ id: doc.id, ...doc.data() } as Transaction);
       });
-      
       setTransactions(fetchedTransactions);
       setStats(calculateDashboardStats(fetchedTransactions));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching transactions:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load transactions from Firebase",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load transactions from Firebase: " + error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch budgets from Firebase
   const fetchBudgetsFromFirebase = async () => {
     if (!user) return;
-    
     try {
       const budgetsRef = collection(db, 'users', user.uid, 'budgets');
       const querySnapshot = await getDocs(budgetsRef);
-      
       const fetchedBudgets: Budget[] = [];
       querySnapshot.forEach((doc) => {
         fetchedBudgets.push({ id: doc.id, ...doc.data() } as Budget);
       });
-      
       setBudgets(fetchedBudgets);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching budgets:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load budgets from Firebase",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to load budgets from Firebase: " + error.message, variant: "destructive" });
     }
   };
 
-  // Update localStorage and stats whenever transactions change
   useEffect(() => {
     if (transactions.length > 0) {
-      // Only save to localStorage if user is not logged in
       if (!user) {
-        localStorage.setItem('financeTrackerData', JSON.stringify(transactions));
+        localStorage.setItem(`${import.meta.env.VITE_LOCAL_STORAGE_PREFIX || 'financeTracker'}Data`, JSON.stringify(transactions));
       }
       setStats(calculateDashboardStats(transactions));
     }
   }, [transactions, user]);
 
-  // Update localStorage whenever budgets change
   useEffect(() => {
-    // Only save to localStorage if user is not logged in
     if (!user) {
-      localStorage.setItem('financeTrackerBudgets', JSON.stringify(budgets));
+      localStorage.setItem(`${import.meta.env.VITE_LOCAL_STORAGE_PREFIX || 'financeTracker'}Budgets`, JSON.stringify(budgets));
     }
   }, [budgets, user]);
 
-  // Calculate budget summaries when transactions or budgets change
   useEffect(() => {
     if (budgets.length === 0) {
       setBudgetSummaries([]);
       return;
     }
-
     const newBudgetSummaries = budgets.map(budget => {
-      // Filter transactions by category and period
       const relevantTransactions = transactions.filter(t => {
-        if (t.category !== budget.category || t.type !== 'Expense') {
-          return false;
-        }
-
+        if (t.category !== budget.category || t.type !== 'Expense') return false;
         const transactionDate = new Date(t.date);
         const now = new Date();
-        
         if (budget.period === 'monthly') {
-          return (
-            transactionDate.getMonth() === now.getMonth() &&
-            transactionDate.getFullYear() === now.getFullYear()
-          );
+          return transactionDate.getMonth() === now.getMonth() && transactionDate.getFullYear() === now.getFullYear();
         } else if (budget.period === 'weekly') {
-          // Get start of current week (Sunday)
           const startOfWeek = new Date(now);
           startOfWeek.setDate(now.getDate() - now.getDay());
           startOfWeek.setHours(0, 0, 0, 0);
-          
           return transactionDate >= startOfWeek;
         } else if (budget.period === 'yearly') {
           return transactionDate.getFullYear() === now.getFullYear();
         }
-        
         return false;
       });
-
       const spent = relevantTransactions.reduce((sum, t) => sum + t.amount, 0);
       const remaining = budget.amount - spent;
       const percentage = (spent / budget.amount) * 100;
-
-      return {
-        budget,
-        spent,
-        remaining,
-        percentage
-      };
+      return { budget, spent, remaining, percentage };
     });
-
     setBudgetSummaries(newBudgetSummaries);
   }, [transactions, budgets]);
 
-  const importCSV = async (csvContent: string) => {
+  const importXLS = (file: File) => {
     setIsLoading(true);
-    try {
-      const newTransactions = parseCSV(csvContent);
-      if (newTransactions.length === 0) {
-        toast({
-          title: "Import Failed",
-          description: "No valid transactions found in the CSV data",
-          variant: "destructive"
-        });
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data || typeof data === 'string') throw new Error('Invalid file data.');
+        const newTransactions = parseXLS(data);
+        if (newTransactions.length === 0) {
+          toast({ title: "Import Failed", description: "No valid transactions found in the XLS file", variant: "destructive" });
+          setIsLoading(false);
+          return;
+        }
+        if (user) {
+          await saveTransactionsToFirebase(newTransactions);
+          await fetchTransactionsFromFirebase();
+        } else {
+          setTransactions(prev => [...prev, ...newTransactions]);
+        }
+        toast({ title: "Import Successful", description: `Imported ${newTransactions.length} transactions from XLS` });
+      } catch (error: any) {
+        console.error('Error importing XLS:', error);
+        toast({ title: "Import Failed", description: error.message || "Failed to parse XLS file", variant: "destructive" });
+      } finally {
         setIsLoading(false);
-        return;
       }
-      
-      if (user) {
-        // User is logged in, save to Firebase
-        await saveTransactionsToFirebase(newTransactions);
-        await fetchTransactionsFromFirebase(); // Refresh the transactions
-      } else {
-        // User is not logged in, save to localStorage
-        setTransactions(prev => {
-          const combined = [...prev, ...newTransactions];
-          return combined;
-        });
-      }
-      
-      toast({
-        title: "Import Successful",
-        description: `Imported ${newTransactions.length} transactions`,
-      });
-    } catch (error) {
-      console.error('Error importing CSV:', error);
-      toast({
-        title: "Import Failed",
-        description: "Failed to parse CSV data",
-        variant: "destructive"
-      });
-    } finally {
+    };
+    reader.onerror = (error) => {
+      console.error('Error reading file:', error);
+      toast({ title: "File Read Error", description: "Failed to read the XLS file: " + (error as Error).message, variant: "destructive" });
       setIsLoading(false);
-    }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
-  // Save transactions to Firebase
   const saveTransactionsToFirebase = async (newTransactions: Transaction[]) => {
     if (!user) return;
-    
     try {
       const transactionsRef = collection(db, 'users', user.uid, 'transactions');
-      
-      // Save each transaction to Firebase
       const promises = newTransactions.map(async (transaction) => {
         await setDoc(doc(transactionsRef, transaction.id), {
           ...transaction,
@@ -308,205 +244,190 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           updatedAt: serverTimestamp()
         });
       });
-      
       await Promise.all(promises);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving transactions to Firebase:', error);
       throw error;
     }
   };
 
-  // Add a single transaction
   const addTransaction = async (transaction: Transaction) => {
     try {
       if (user) {
-        // User is logged in, save to Firebase
         const transactionsRef = collection(db, 'users', user.uid, 'transactions');
         await setDoc(doc(transactionsRef, transaction.id), {
           ...transaction,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        
-        // Refresh transactions
         await fetchTransactionsFromFirebase();
       } else {
-        // User is not logged in, save to localStorage
         setTransactions(prev => [...prev, transaction]);
       }
-      
-      toast({
-        title: "Transaction Added",
-        description: "Your transaction has been successfully added",
-      });
-    } catch (error) {
+      toast({ title: "Transaction Added", description: "Your transaction has been successfully added" });
+    } catch (error: any) {
       console.error('Error adding transaction:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add transaction",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to add transaction: " + error.message, variant: "destructive" });
       throw error;
+    }
+  };
+
+  const updateTransaction = async (transaction: Transaction) => {
+    try {
+      if (user) {
+        const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+        await setDoc(doc(transactionsRef, transaction.id), {
+          ...transaction,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        await fetchTransactionsFromFirebase();
+      } else {
+        setTransactions(prev => prev.map(t => t.id === transaction.id ? transaction : t));
+      }
+      toast({ title: "Transaction Updated", description: "Your transaction has been updated" });
+    } catch (error: any) {
+      console.error("Error updating transaction:", error);
+      toast({ title: "Error", description: "Failed to update transaction: " + error.message, variant: "destructive" });
+      throw error;
+    }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    try {
+      if (user) {
+        const transactionsRef = collection(db, 'users', user.uid, 'transactions');
+        await deleteDoc(doc(transactionsRef, id));
+        await fetchTransactionsFromFirebase();
+      } else {
+        setTransactions(prev => prev.filter(t => t.id !== id));
+      }
+      toast({ title: "Transaction Deleted", description: "Transaction has been removed" });
+    } catch (error: any) {
+      console.error("Error deleting transaction:", error);
+      toast({ title: "Error", description: "Failed to delete transaction: " + error.message, variant: "destructive" });
+      throw error;
+    }
+  };
+
+  const refreshData = async () => {
+    try {
+      if (user) {
+        await fetchTransactionsFromFirebase();
+        await fetchBudgetsFromFirebase();
+        toast({ title: "Data Refreshed", description: "Data has been refreshed successfully" });
+      } else {
+        const savedData = localStorage.getItem('financeTrackerData');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          setTransactions(parsedData);
+          setStats(calculateDashboardStats(parsedData));
+          toast({ title: "Data Refreshed", description: "Local data has been refreshed" });
+        } else {
+          toast({ title: "No Data", description: "No local data available" });
+        }
+      }
+    } catch (error: any) {
+      console.error("Error refreshing data:", error);
+      toast({ title: "Error", description: "Failed to refresh data: " + error.message, variant: "destructive" });
+    }
+  };
+
+  const exportData = () => {
+    try {
+      const data = { transactions, budgets };
+      return JSON.stringify(data, null, 2);
+    } catch (error: any) {
+      console.error("Error exporting data:", error);
+      toast({ title: "Error", description: "Failed to export data: " + error.message, variant: "destructive" });
+      return "";
     }
   };
 
   const clearData = async () => {
     if (user) {
-      // User is logged in, clear from Firebase
       try {
         setIsLoading(true);
         const transactionsRef = collection(db, 'users', user.uid, 'transactions');
         const budgetsRef = collection(db, 'users', user.uid, 'budgets');
-        
-        // Get all transactions
         const transactionsSnapshot = await getDocs(transactionsRef);
         const transactionPromises = transactionsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-        
-        // Get all budgets
         const budgetsSnapshot = await getDocs(budgetsRef);
         const budgetPromises = budgetsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-        
-        // Execute all deletes
         await Promise.all([...transactionPromises, ...budgetPromises]);
-        
-        // Refresh the data
         setTransactions([]);
         setBudgets([]);
         setStats(initialStats);
-        
-        toast({
-          title: "Data Cleared",
-          description: "All financial data has been removed from Firebase",
-        });
-      } catch (error) {
+        toast({ title: "Data Cleared", description: "All financial data has been removed from Firebase" });
+      } catch (error: any) {
         console.error('Error clearing Firebase data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to clear data from Firebase",
-          variant: "destructive"
-        });
+        toast({ title: "Error", description: "Failed to clear data from Firebase: " + error.message, variant: "destructive" });
       } finally {
         setIsLoading(false);
       }
     } else {
-      // User is not logged in, clear localStorage
       setTransactions([]);
       setBudgets([]);
       setStats(initialStats);
       localStorage.removeItem('financeTrackerData');
       localStorage.removeItem('financeTrackerBudgets');
-      toast({
-        title: "Data Cleared",
-        description: "All financial data has been removed",
-      });
+      toast({ title: "Data Cleared", description: "All financial data has been removed" });
     }
   };
 
   const addBudget = async (budget: Budget) => {
     try {
       if (user) {
-        // User is logged in, save to Firebase
         const budgetsRef = collection(db, 'users', user.uid, 'budgets');
-        
-        // Check if budget for this category already exists
         const q = query(budgetsRef, where("category", "==", budget.category));
         const querySnapshot = await getDocs(q);
-        
         if (!querySnapshot.empty) {
-          // Update existing budget
           const docRef = querySnapshot.docs[0].ref;
-          await updateDoc(docRef, {
-            ...budget,
-            updatedAt: serverTimestamp()
-          });
+          await updateDoc(docRef, { ...budget, updatedAt: serverTimestamp() });
         } else {
-          // Add new budget
-          await setDoc(doc(budgetsRef, budget.id), {
-            ...budget,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
+          await setDoc(doc(budgetsRef, budget.id), { ...budget, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         }
-        
-        // Refresh budgets
         await fetchBudgetsFromFirebase();
-        
-        toast({
-          title: "Budget Updated",
-          description: `Updated budget for ${budget.category}`,
-        });
+        toast({ title: "Budget Updated", description: `Updated budget for ${budget.category}` });
       } else {
-        // User is not logged in, save to localStorage
-        // Check if budget for this category already exists
         const existingIndex = budgets.findIndex(b => b.category === budget.category);
-        
         if (existingIndex >= 0) {
-          // Update existing budget
           const updatedBudgets = [...budgets];
           updatedBudgets[existingIndex] = budget;
           setBudgets(updatedBudgets);
-          toast({
-            title: "Budget Updated",
-            description: `Updated budget for ${budget.category}`,
-          });
+          toast({ title: "Budget Updated", description: `Updated budget for ${budget.category}` });
         } else {
-          // Add new budget
           setBudgets(prev => [...prev, budget]);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding/updating budget:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update budget",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to update budget: " + error.message, variant: "destructive" });
     }
   };
 
   const deleteBudget = async (id: string) => {
     try {
       if (user) {
-        // User is logged in, delete from Firebase
         const budgetRef = doc(db, 'users', user.uid, 'budgets', id);
         await deleteDoc(budgetRef);
-        
-        // Refresh budgets
         await fetchBudgetsFromFirebase();
       } else {
-        // User is not logged in, delete from localStorage
         setBudgets(prev => prev.filter(budget => budget.id !== id));
       }
-      
-      toast({
-        title: "Budget Removed",
-        description: "Budget has been deleted",
-      });
-    } catch (error) {
+      toast({ title: "Budget Removed", description: "Budget has been deleted" });
+    } catch (error: any) {
       console.error('Error deleting budget:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete budget",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Failed to delete budget: " + error.message, variant: "destructive" });
     }
   };
 
-  // Authentication functions
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Signed In",
-        description: "Welcome back!",
-      });
+      toast({ title: "Signed In", description: "Welcome back!" });
     } catch (error: any) {
       console.error('Error signing in:', error);
-      toast({
-        title: "Sign In Failed",
-        description: error.message || "Failed to sign in",
-        variant: "destructive"
-      });
+      toast({ title: "Sign In Failed", description: error.message || "Failed to sign in", variant: "destructive" });
       throw error;
     }
   };
@@ -514,17 +435,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const signUp = async (email: string, password: string) => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Account Created",
-        description: "Your account has been created successfully",
-      });
+      toast({ title: "Account Created", description: "Your account has been created successfully" });
     } catch (error: any) {
       console.error('Error signing up:', error);
-      toast({
-        title: "Sign Up Failed",
-        description: error.message || "Failed to create account",
-        variant: "destructive"
-      });
+      toast({ title: "Sign Up Failed", description: error.message || "Failed to create account", variant: "destructive" });
       throw error;
     }
   };
@@ -532,40 +446,35 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const logout = async () => {
     try {
       await signOut(auth);
-      toast({
-        title: "Signed Out",
-        description: "You have been signed out",
-      });
-      
-      // Clear in-memory data when logging out
+      toast({ title: "Signed Out", description: "You have been signed out" });
       setTransactions([]);
       setBudgets([]);
       setStats(initialStats);
     } catch (error: any) {
       console.error('Error signing out:', error);
-      toast({
-        title: "Sign Out Failed",
-        description: error.message || "Failed to sign out",
-        variant: "destructive"
-      });
+      toast({ title: "Sign Out Failed", description: error.message || "Failed to sign out", variant: "destructive" });
       throw error;
     }
   };
 
   return (
-    <FinanceContext.Provider value={{ 
-      transactions, 
-      stats, 
+    <FinanceContext.Provider value={{
+      transactions,
+      stats,
       budgets,
       budgetSummaries,
       user,
       isLoading,
       isAuthLoading,
-      importCSV, 
+      importXLS,
       addTransaction,
+      updateTransaction,
+      deleteTransaction,
       clearData,
       addBudget,
       deleteBudget,
+      refreshData,
+      exportData,
       signIn,
       signUp,
       logout
