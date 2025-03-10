@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { 
   Transaction, 
@@ -151,4 +150,40 @@ export const formatCurrency = (amount: number): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
+};
+
+// Format date for consistent display
+export const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  
+  // Check if date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid date';
+  }
+  
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(date);
+};
+
+// Generate example CSV data for demonstration
+export const getExampleCSV = (): string => {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const lastWeek = new Date(today);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+  
+  const formatDateForCSV = (date: Date): string => {
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+  };
+  
+  return `account,category,amount,type,payment_type,note,date
+Bank Account,Salary,3000,Income,TRANSFER,Monthly salary,${formatDateForCSV(today)}
+Credit Card,Groceries,120.50,Expense,CREDIT_CARD,Weekly shopping,${formatDateForCSV(yesterday)}
+Cash,Entertainment,45.99,Expense,CASH,Movie tickets,${formatDateForCSV(yesterday)}
+Bank Account,Rent,1200,Expense,TRANSFER,Monthly rent,${formatDateForCSV(lastWeek)}
+Savings,Investment,500,Expense,TRANSFER,Stock purchase,${formatDateForCSV(lastWeek)}`;
 };
