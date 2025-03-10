@@ -1,45 +1,44 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AccountSummary } from '@/types/finance';
-import { formatCurrency } from '@/utils/finance-utils';
 import { Progress } from '@/components/ui/progress';
+import { formatCurrency } from '@/utils/finance-utils';
+import { AccountSummary } from '@/types/finance';
 
 interface AccountsOverviewProps {
   accounts: AccountSummary[];
 }
 
 const AccountsOverview: React.FC<AccountsOverviewProps> = ({ accounts }) => {
+  const total = accounts.reduce((sum, account) => sum + account.total, 0);
+  
   return (
-    <Card className="bg-card/60 backdrop-blur-sm shadow-sm border animate-in">
-      <CardHeader>
-        <CardTitle className="text-xl">Accounts Overview</CardTitle>
+    <Card className="h-full">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium">Accounts Overview</CardTitle>
       </CardHeader>
-      <CardContent>
-        {accounts.length > 0 ? (
-          <div className="space-y-4">
-            {accounts.map((account, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="font-medium">{account.account}</span>
-                  <span 
-                    className={account.total >= 0 ? 'text-income' : 'text-expense'}
-                  >
-                    {formatCurrency(account.total)}
-                  </span>
-                </div>
-                <Progress 
-                  value={account.percentage} 
-                  className="h-2" 
-                  indicatorClassName={account.total >= 0 ? 'bg-income' : 'bg-expense'} 
-                />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-10 text-center text-muted-foreground">
+      <CardContent className="space-y-4">
+        {accounts.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
             No account data available
           </div>
+        ) : (
+          accounts.map((account, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">{account.account}</span>
+                <span className="text-sm">{formatCurrency(account.total)}</span>
+              </div>
+              <Progress 
+                value={account.percentage} 
+                className="h-2" 
+                // Remove the indicatorClassName property
+              />
+              <div className="text-xs text-muted-foreground">
+                {account.percentage.toFixed(1)}% of total
+              </div>
+            </div>
+          ))
         )}
       </CardContent>
     </Card>

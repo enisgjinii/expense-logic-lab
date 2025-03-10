@@ -42,3 +42,25 @@ export interface DashboardStats {
   byMonth: MonthlyData[];
   recentTransactions: Transaction[];
 }
+
+export interface Budget {
+  id: string;
+  category: string;
+  amount: number;
+  period: 'monthly' | 'weekly' | 'yearly';
+  createdAt: string;
+}
+
+export interface BudgetSummary {
+  budget: Budget;
+  spent: number;
+  remaining: number;
+  percentage: number;
+}
+
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -9,8 +9,14 @@ import {
   Upload, 
   Menu, 
   X,
-  CreditCard
+  CreditCard,
+  LogOut,
+  UserCircle,
+  PieChart
 } from 'lucide-react';
+import { useFinance } from '@/contexts/FinanceContext';
+import { toast } from '@/components/ui/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const SidebarItem = ({ 
   icon, 
@@ -41,6 +47,8 @@ const SidebarItem = ({
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useFinance();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const navigationItems = [
@@ -55,11 +63,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       to: "/transactions",
     },
     {
+      icon: <PieChart className="h-5 w-5" />,
+      label: "Budget",
+      to: "/budget",
+    },
+    {
       icon: <Upload className="h-5 w-5" />,
       label: "Import",
       to: "/import",
     },
   ];
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/auth');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -72,18 +94,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <h1 className="font-semibold">Finance Tracker</h1>
             </div>
             
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle Menu"
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
+            <div className="flex items-center gap-2">
+              {user && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
+                      <UserCircle className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-            </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                aria-label="Toggle Menu"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -102,6 +142,29 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   isActive={location.pathname === item.to}
                 />
               ))}
+              
+              {user && (
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Logout</span>
+                </Button>
+              )}
+              
+              {!user && (
+                <Link to="/auth">
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
+                  >
+                    <UserCircle className="h-5 w-5" />
+                    <span>Login / Sign Up</span>
+                  </Button>
+                </Link>
+              )}
             </nav>
           </div>
         </div>
@@ -126,6 +189,29 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               />
             ))}
           </nav>
+          
+          <div className="mt-auto border-t pt-4">
+            {user ? (
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 p-3 font-normal"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-5 w-5" />
+                <span>Logout</span>
+              </Button>
+            ) : (
+              <Link to="/auth">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start gap-3 p-3 font-normal"
+                >
+                  <UserCircle className="h-5 w-5" />
+                  <span>Login / Sign Up</span>
+                </Button>
+              </Link>
+            )}
+          </div>
         </aside>
         
         {/* Main Content */}
