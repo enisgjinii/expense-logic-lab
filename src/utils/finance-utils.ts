@@ -34,6 +34,12 @@ export const parseCSV = (csvContent: string): Transaction[] => {
     try {
       // Handle quoted values with commas inside
       const line = lines[i];
+      
+      // Skip empty lines
+      if (!line.trim()) {
+        continue;
+      }
+      
       const values: string[] = [];
       let insideQuote = false;
       let currentValue = '';
@@ -58,7 +64,17 @@ export const parseCSV = (csvContent: string): Transaction[] => {
       const cleanedValues = values.map(val => val.replace(/^"|"$/g, ''));
       
       if (cleanedValues.length < 6) {
-        errors.push(`Row ${i + 1}: Insufficient columns (expected at least 6, got ${cleanedValues.length})`);
+        let errorMessage = `Row ${i + 1}: Insufficient columns (expected at least 6, got ${cleanedValues.length})`;
+        
+        // Add more context to help the user find the problem
+        errorMessage += ` | Raw data: ${line.substring(0, 40)}${line.length > 40 ? '...' : ''}`;
+        
+        // Check for common problems
+        if (line.includes('"') && line.split('"').length % 2 !== 1) {
+          errorMessage += " | Possible issue: Unmatched quotes in this row.";
+        }
+        
+        errors.push(errorMessage);
         continue;
       }
       
@@ -66,24 +82,39 @@ export const parseCSV = (csvContent: string): Transaction[] => {
       
       // Basic validation
       if (!account || !category || !amountStr) {
-        errors.push(`Row ${i + 1}: Missing required fields`);
+        const missingFields = [];
+        if (!account) missingFields.push('account');
+        if (!category) missingFields.push('category');
+        if (!amountStr) missingFields.push('amount');
+        
+        errors.push(
+          `Row ${i + 1}: Missing required fields (${missingFields.join(', ')}) | Raw data: ${line.substring(0, 40)}${line.length > 40 ? '...' : ''}`
+        );
         continue;
       }
       
       // Parse amount (handle negative values for expenses if needed)
-      let amount = parseFloat(amountStr.replace(/,/g, ''));
+      // Support for various number formats (commas, parentheses for negative)
+      let amountNormalized = amountStr
+        .replace(/\(([^)]+)\)/, '-$1') // Convert (123.45) to -123.45
+        .replace(/,/g, ''); // Remove thousands separators
+      
+      let amount = parseFloat(amountNormalized);
+      
       if (isNaN(amount)) {
-        errors.push(`Row ${i + 1}: Invalid amount format`);
+        errors.push(`Row ${i + 1}: Invalid amount format "${amountStr}" | Raw data: ${line.substring(0, 40)}${line.length > 40 ? '...' : ''}`);
         continue;
       }
       
       // Convert amount to positive for proper type handling
       let type: 'Income' | 'Expense' = 'Expense';
       if (typeStr) {
-        if (typeStr.toLowerCase() === 'income') {
+        // More flexible type detection
+        const normalizedType = typeStr.toLowerCase().trim();
+        if (['income', 'revenue', 'deposit', 'credit'].includes(normalizedType)) {
           type = 'Income';
           amount = Math.abs(amount);
-        } else if (['expense', 'expenses'].includes(typeStr.toLowerCase())) {
+        } else if (['expense', 'expenses', 'payment', 'debit', 'withdrawal'].includes(normalizedType)) {
           type = 'Expense';
           amount = Math.abs(amount);
         } else {
@@ -94,6 +125,7 @@ export const parseCSV = (csvContent: string): Transaction[] => {
           } else {
             type = 'Income';
           }
+          errors.push(`Row ${i + 1}: Unclear transaction type "${typeStr}", using ${type} based on amount sign`);
         }
       } else {
         // Use the sign of the amount as fallback
@@ -105,22 +137,74 @@ export const parseCSV = (csvContent: string): Transaction[] => {
       
       // Validate payment type
       const validPaymentTypes = ['TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD', 'CASH'];
-      const normalizedPaymentType = payment_type.toUpperCase();
+      let normalizedPaymentType = payment_type.toUpperCase().trim().replace(/ /g, '_');
+      
+      // Handle common variations
+      if (normalizedPaymentType === 'DEBIT') normalizedPaymentType = 'DEBIT_CARD';
+      if (normalizedPaymentType === 'CREDIT') normalizedPaymentType = 'CREDIT_CARD';
+      if (['BANK', 'WIRE', 'ACH'].includes(normalizedPaymentType)) normalizedPaymentType = 'TRANSFER';
+      
       if (!validPaymentTypes.includes(normalizedPaymentType)) {
-        errors.push(`Row ${i + 1}: Invalid payment type (using TRANSFER as default)`);
+        errors.push(`Row ${i + 1}: Invalid payment type "${payment_type}" (using TRANSFER as default)`);
+        normalizedPaymentType = 'TRANSFER';
       }
       
       // Parse date or use current date as fallback
       let date = new Date();
+      let dateParseError = false;
+      
       if (dateStr) {
-        const parsedDate = new Date(dateStr);
-        if (!isNaN(parsedDate.getTime())) {
-          date = parsedDate;
-        } else {
-          errors.push(`Row ${i + 1}: Invalid date format (using current date as default)`);
+        // Try multiple date formats
+        const dateToParse = dateStr.trim();
+        const formats = [
+          // ISO format
+          /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/,
+          // US format
+          /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+          // European format
+          /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+        ];
+        
+        let parsed = false;
+        
+        // Try direct Date parsing first
+        const directParse = new Date(dateToParse);
+        if (!isNaN(directParse.getTime())) {
+          date = directParse;
+          parsed = true;
+        }
+        
+        // Try regex formats if direct parse failed
+        if (!parsed) {
+          for (const regex of formats) {
+            const match = dateToParse.match(regex);
+            if (match) {
+              let year, month, day, hours = 0, minutes = 0, seconds = 0;
+              
+              if (regex === formats[0]) { // ISO
+                [, year, month, day, hours, minutes, seconds] = match.map(v => v ? parseInt(v, 10) : 0);
+              } else if (regex === formats[1]) { // US
+                [, month, day, year, hours, minutes, seconds] = match.map(v => v ? parseInt(v, 10) : 0);
+              } else { // European
+                [, day, month, year, hours, minutes, seconds] = match.map(v => v ? parseInt(v, 10) : 0);
+              }
+              
+              // JavaScript months are 0-indexed
+              date = new Date(year, month - 1, day, hours || 0, minutes || 0, seconds || 0);
+              parsed = true;
+              break;
+            }
+          }
+        }
+        
+        if (!parsed || isNaN(date.getTime())) {
+          errors.push(`Row ${i + 1}: Invalid date format "${dateStr}" (using current date as default)`);
+          date = new Date();
+          dateParseError = true;
         }
       }
       
+      // Create transaction object
       results.push({
         id: uuidv4(),
         account,
@@ -131,7 +215,8 @@ export const parseCSV = (csvContent: string): Transaction[] => {
           ? normalizedPaymentType as any 
           : 'TRANSFER',
         note: note || '',
-        date: date.toISOString().slice(0, 19).replace('T', ' ')
+        date: dateParseError ? new Date().toISOString().slice(0, 19).replace('T', ' ')
+             : date.toISOString().slice(0, 19).replace('T', ' ')
       });
     } catch (error) {
       errors.push(`Error processing row ${i + 1}: ${(error as Error).message}`);
@@ -287,3 +372,179 @@ Cash,"Entertainment",45.99,Expense,CASH,Movie tickets,${formatDateForCSV(yesterd
 Bank Account,Rent,1200,Expense,TRANSFER,Monthly rent,${formatDateForCSV(lastWeek)}
 Savings,Investment,500,Expense,TRANSFER,Stock purchase,${formatDateForCSV(lastWeek)}`;
 };
+
+// Analyze CSV format to try to detect column positions
+export const analyzeCSVFormat = (csvContent: string): { 
+  detectedFormat: boolean;
+  columnMap: Record<string, number>;
+  headerRow?: string;
+  suggestedCorrections?: string;
+} => {
+  // If empty content, return default mapping
+  if (!csvContent.trim()) {
+    return {
+      detectedFormat: false,
+      columnMap: {},
+      suggestedCorrections: "CSV content is empty."
+    };
+  }
+  
+  const lines = csvContent.trim().split('\n');
+  if (lines.length === 0) {
+    return {
+      detectedFormat: false,
+      columnMap: {},
+      suggestedCorrections: "CSV content is empty."
+    };
+  }
+  
+  // Try to detect header
+  const headerRow = lines[0];
+  const headerColumns = headerRow.toLowerCase()
+    .split(',')
+    .map(h => h.trim().replace(/^"|"$/g, ''));
+  
+  // Expected column names and their possible variations
+  const expectedColumns = {
+    account: ['account', 'bank', 'source', 'from', 'account name'],
+    category: ['category', 'categories', 'type', 'spending category'],
+    amount: ['amount', 'sum', 'value', 'price', 'cost', 'balance'],
+    type: ['transaction type', 'type', 'direction', 'income/expense', 'in/out', 'flow'],
+    payment_type: ['payment type', 'payment method', 'method', 'payment', 'medium'],
+    note: ['note', 'notes', 'description', 'memo', 'details', 'comment'],
+    date: ['date', 'time', 'transaction date', 'datetime', 'when']
+  };
+  
+  const columnMap: Record<string, number> = {};
+  let detectedFormat = false;
+  
+  // Try to map columns based on header
+  for (const [key, variations] of Object.entries(expectedColumns)) {
+    const foundIndex = headerColumns.findIndex(h => 
+      variations.some(v => h.includes(v))
+    );
+    
+    if (foundIndex !== -1) {
+      columnMap[key] = foundIndex;
+      detectedFormat = true;
+    }
+  }
+  
+  // If no format detected from header, try to analyze the first data row
+  if (!detectedFormat && lines.length > 1) {
+    const firstDataRow = lines[1];
+    const firstDataValues = parseCsvLine(firstDataRow);
+    
+    // Try to detect date columns
+    const potentialDateColumns = firstDataValues
+      .map((val, idx) => ({ value: val, index: idx }))
+      .filter(({ value }) => {
+        // Check for date-like formats
+        return /\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}/.test(value) || 
+               /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value);
+      });
+    
+    if (potentialDateColumns.length > 0) {
+      columnMap['date'] = potentialDateColumns[0].index;
+    }
+    
+    // Try to detect amount columns
+    const potentialAmountColumns = firstDataValues
+      .map((val, idx) => ({ value: val, index: idx }))
+      .filter(({ value }) => {
+        // Check for currency/amount-like formats
+        return /^-?\$?\d+(\.\d+)?$/.test(value.replace(',', '')) || 
+               /^-?\d+(\.\d+)?$/.test(value.replace(',', ''));
+      });
+    
+    if (potentialAmountColumns.length > 0) {
+      columnMap['amount'] = potentialAmountColumns[0].index;
+    }
+  }
+  
+  // Generate suggestions if format detection is incomplete
+  let suggestedCorrections = undefined;
+  const missingColumns = Object.keys(expectedColumns).filter(k => !(k in columnMap));
+  
+  if (missingColumns.length > 0) {
+    suggestedCorrections = "Detected CSV format is incomplete. ";
+    
+    if (missingColumns.length === Object.keys(expectedColumns).length) {
+      suggestedCorrections += "Could not identify any column headers. Ensure the CSV has a header row with these columns: account, category, amount, type, payment_type, note, date.";
+    } else {
+      suggestedCorrections += `Missing columns: ${missingColumns.join(', ')}. Consider adding these columns or renaming existing ones.`;
+    }
+  }
+  
+  return {
+    detectedFormat,
+    columnMap,
+    headerRow,
+    suggestedCorrections
+  };
+};
+
+// Helper function to parse a CSV line handling quoted values with commas
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let insideQuote = false;
+  let currentValue = '';
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      insideQuote = !insideQuote;
+    } else if (char === ',' && !insideQuote) {
+      values.push(currentValue.trim());
+      currentValue = '';
+    } else {
+      currentValue += char;
+    }
+  }
+  
+  values.push(currentValue.trim());
+  return values.map(val => val.replace(/^"|"$/g, ''));
+}
+
+// Validate a single transaction object
+export const validateTransaction = (transaction: Partial<Transaction>): { 
+  valid: boolean; 
+  errors: string[];
+} => {
+  const errors: string[] = [];
+  
+  if (!transaction.account || transaction.account.trim() === '') {
+    errors.push('Account is required');
+  }
+  
+  if (!transaction.category || transaction.category.trim() === '') {
+    errors.push('Category is required');
+  }
+  
+  if (transaction.amount === undefined || isNaN(transaction.amount)) {
+    errors.push('Amount must be a valid number');
+  }
+  
+  if (transaction.type !== 'Income' && transaction.type !== 'Expense') {
+    errors.push('Type must be either "Income" or "Expense"');
+  }
+  
+  const validPaymentTypes = ['TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD', 'CASH'];
+  if (!transaction.payment_type || !validPaymentTypes.includes(transaction.payment_type)) {
+    errors.push(`Payment type must be one of: ${validPaymentTypes.join(', ')}`);
+  }
+  
+  if (transaction.date) {
+    const dateObj = new Date(transaction.date);
+    if (isNaN(dateObj.getTime())) {
+      errors.push('Date must be a valid date format');
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+};
+
