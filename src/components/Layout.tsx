@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -12,23 +11,21 @@ import {
   CreditCard,
   LogOut,
   UserCircle,
-  PieChart
+  PieChart,
+  Check
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/components/ui/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const SidebarItem = ({ 
-  icon, 
-  label, 
-  to, 
-  isActive 
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  to: string; 
+interface SidebarItemProps {
+  icon: React.ReactNode;
+  label: string;
+  to: string;
   isActive: boolean;
-}) => {
+}
+
+const SidebarItem = ({ icon, label, to, isActive }: SidebarItemProps) => {
   return (
     <Link to={to}>
       <Button 
@@ -48,7 +45,7 @@ const SidebarItem = ({
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useFinance();
+  const { user, logout, themeMode, setThemeMode } = useFinance();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const navigationItems = [
@@ -82,7 +79,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       console.error('Logout error:', error);
     }
   };
-  
+
+  // Theme switcher component for mobile dropdown
+  const MobileThemeSwitcher = () => (
+    <>
+      <DropdownMenuItem disabled className="opacity-70">
+        Theme
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setThemeMode("light")}>
+        Light {themeMode === "light" && <Check className="ml-auto h-4 w-4" />}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setThemeMode("dark")}>
+        Dark {themeMode === "dark" && <Check className="ml-auto h-4 w-4" />}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => setThemeMode("system")}>
+        System {themeMode === "system" && <Check className="ml-auto h-4 w-4" />}
+      </DropdownMenuItem>
+    </>
+  );
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Mobile Header */}
@@ -107,6 +122,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Logout</span>
                     </DropdownMenuItem>
+                    <MobileThemeSwitcher />
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -143,18 +159,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 />
               ))}
               
-              {user && (
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="h-5 w-5" />
-                  <span>Logout</span>
-                </Button>
-              )}
-              
-              {!user && (
+              {user ? (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
+                    onClick={handleLogout}
+                  >
+                    <LogOut className="h-5 w-5" />
+                    <span>Logout</span>
+                  </Button>
+                </>
+              ) : (
                 <Link to="/auth">
                   <Button 
                     variant="ghost" 
@@ -190,7 +206,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             ))}
           </nav>
           
-          <div className="mt-auto border-t pt-4">
+          <div className="mt-auto border-t pt-4 px-4 flex flex-col gap-4">
             {user ? (
               <Button 
                 variant="ghost" 
@@ -211,6 +227,36 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </Button>
               </Link>
             )}
+            {/* Desktop Theme Switcher */}
+            <div className="border-t pt-4">
+              <p className="mb-2 text-sm font-medium">Theme</p>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className={cn(themeMode === "light" && "bg-accent text-accent-foreground")}
+                  onClick={() => setThemeMode("light")}
+                >
+                  Light
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className={cn(themeMode === "dark" && "bg-accent text-accent-foreground")}
+                  onClick={() => setThemeMode("dark")}
+                >
+                  Dark
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className={cn(themeMode === "system" && "bg-accent text-accent-foreground")}
+                  onClick={() => setThemeMode("system")}
+                >
+                  System
+                </Button>
+              </div>
+            </div>
           </div>
         </aside>
         

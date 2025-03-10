@@ -57,6 +57,9 @@ interface FinanceContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  // Theme mode support
+  themeMode: "light" | "dark" | "system";
+  setThemeMode: (mode: "light" | "dark" | "system") => void;
 }
 
 const initialStats: DashboardStats = {
@@ -79,6 +82,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  
+  // Theme mode state: "light", "dark", or "system"
+  const [themeMode, setThemeMode] = useState<"light" | "dark" | "system">("system");
+
+  // Load saved theme from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("themeMode") as "light" | "dark" | "system" | null;
+    if (savedTheme) {
+      setThemeMode(savedTheme);
+    }
+  }, []);
+
+  // Apply theme by adding CSS class to document root
+  useEffect(() => {
+    const getPreferredTheme = (mode: "light" | "dark" | "system") => {
+      if (mode === "system") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+      return mode;
+    };
+
+    const appliedTheme = getPreferredTheme(themeMode);
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(appliedTheme);
+    localStorage.setItem("themeMode", themeMode);
+  }, [themeMode]);
+
+  // Listen for system theme changes if in "system" mode
+  useEffect(() => {
+    if (themeMode === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = () => {
+        const appliedTheme = mediaQuery.matches ? "dark" : "light";
+        document.documentElement.classList.remove("light", "dark");
+        document.documentElement.classList.add(appliedTheme);
+      };
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+  }, [themeMode]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -477,7 +520,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       exportData,
       signIn,
       signUp,
-      logout
+      logout,
+      themeMode,
+      setThemeMode
     }}>
       {children}
     </FinanceContext.Provider>
