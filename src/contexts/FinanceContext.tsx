@@ -13,15 +13,14 @@ import {
   User as FirebaseUser
 } from 'firebase/auth';
 
-// Firebase configuration
 const firebaseConfig = {
   // This would be filled with your Firebase config
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBl83QJGd2xdamHmfgC4jhxW3nIxFkm9Q0",
+  authDomain: "channelanalyzer-f8b10.firebaseapp.com",
+  projectId: "channelanalyzer-f8b10",
+  storageBucket: "channelanalyzer-f8b10.firebasestorage.app",
+  messagingSenderId: "368302555628",
+  appId: "1:368302555628:web:f63747c8831ae916dd80c9"
 };
 
 // Initialize Firebase
