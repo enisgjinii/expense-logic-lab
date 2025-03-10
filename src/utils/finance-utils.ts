@@ -24,6 +24,20 @@ const categoryColors = [
   "#F1F0FB",
 ];
 
+// Helper function to convert Excel serial dates to JavaScript Date objects.
+const convertExcelDate = (excelSerial: number): Date => {
+  // Excel's epoch starts on January 1, 1900.
+  // Excel incorrectly treats 1900 as a leap year, so we subtract 25569 days (difference between 1900-01-01 and 1970-01-01)
+  const utc_days = Math.floor(excelSerial - 25569);
+  const utc_value = utc_days * 86400; // seconds per day
+  const date = new Date(utc_value * 1000);
+  // Calculate fractional day (time part)
+  const fractional_day = excelSerial - Math.floor(excelSerial);
+  const totalSeconds = Math.floor(86400 * fractional_day);
+  date.setSeconds(date.getSeconds() + totalSeconds);
+  return date;
+};
+
 export const parseXLS = (data: ArrayBuffer): Transaction[] => {
   const transactions: Transaction[] = [];
   const errors: string[] = [];
@@ -39,9 +53,7 @@ export const parseXLS = (data: ArrayBuffer): Transaction[] => {
     try {
       rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
     } catch (e) {
-      throw new Error(
-        "Failed to convert sheet to JSON: " + (e as Error).message
-      );
+      throw new Error("Failed to convert sheet to JSON: " + (e as Error).message);
     }
     if (rows.length === 0) throw new Error("The XLS file is empty.");
     const headerRow = rows[0].map((cell: string) =>
@@ -67,9 +79,7 @@ export const parseXLS = (data: ArrayBuffer): Transaction[] => {
           continue;
         if (row.length < 7) {
           errors.push(
-            `Row ${i + 1}: Insufficient columns (expected 7, got ${
-              row.length
-            }).`
+            `Row ${i + 1}: Insufficient columns (expected 7, got ${row.length}).`
           );
           continue;
         }
@@ -117,9 +127,7 @@ export const parseXLS = (data: ArrayBuffer): Transaction[] => {
             type = amount < 0 ? "Expense" : "Income";
             amount = Math.abs(amount);
             errors.push(
-              `Row ${
-                i + 1
-              }: Unclear transaction type "${typeStr}", using ${type} based on amount sign.`
+              `Row ${i + 1}: Unclear transaction type "${typeStr}", using ${type} based on amount sign.`
             );
           }
         } else {
@@ -139,59 +147,56 @@ export const parseXLS = (data: ArrayBuffer): Transaction[] => {
           normPayment = "TRANSFER";
         if (!validPaymentTypes.includes(normPayment)) {
           errors.push(
-            `Row ${
-              i + 1
-            }: Invalid payment type "${paymentTypeRaw}" (using TRANSFER as default)`
+            `Row ${i + 1}: Invalid payment type "${paymentTypeRaw}" (using TRANSFER as default)`
           );
           normPayment = "TRANSFER";
         }
         let date = new Date();
         if (dateStr) {
-          const dt = dateStr;
-          const direct = new Date(dt);
-          if (!isNaN(direct.getTime())) {
-            date = direct;
+          // Check if the date string is a numeric Excel serial date.
+          const excelSerial = parseFloat(dateStr);
+          if (!isNaN(excelSerial) && /^\d+(\.\d+)?$/.test(dateStr)) {
+            date = convertExcelDate(excelSerial);
           } else {
-            const formats = [
-              /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/,
-              /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
-              /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
-            ];
-            let parsed = false;
-            for (const regex of formats) {
-              const match = dt.match(regex);
-              if (match) {
-                let year,
-                  month,
-                  day,
-                  hours = 0,
-                  minutes = 0,
-                  seconds = 0;
-                if (regex === formats[0]) {
-                  [, year, month, day, hours, minutes, seconds] = match.map(
-                    (v) => (v ? parseInt(v, 10) : 0)
-                  );
-                } else if (regex === formats[1]) {
-                  [, month, day, year, hours, minutes, seconds] = match.map(
-                    (v) => (v ? parseInt(v, 10) : 0)
-                  );
-                } else {
-                  [, day, month, year, hours, minutes, seconds] = match.map(
-                    (v) => (v ? parseInt(v, 10) : 0)
-                  );
+            const dt = dateStr;
+            const direct = new Date(dt);
+            if (!isNaN(direct.getTime())) {
+              date = direct;
+            } else {
+              const formats = [
+                /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/,
+                /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+                /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+              ];
+              let parsed = false;
+              for (const regex of formats) {
+                const match = dt.match(regex);
+                if (match) {
+                  let year, month, day, hours = 0, minutes = 0, seconds = 0;
+                  if (regex === formats[0]) {
+                    [, year, month, day, hours, minutes, seconds] = match.map((v) =>
+                      v ? parseInt(v, 10) : 0
+                    );
+                  } else if (regex === formats[1]) {
+                    [, month, day, year, hours, minutes, seconds] = match.map((v) =>
+                      v ? parseInt(v, 10) : 0
+                    );
+                  } else {
+                    [, day, month, year, hours, minutes, seconds] = match.map((v) =>
+                      v ? parseInt(v, 10) : 0
+                    );
+                  }
+                  date = new Date(year, month - 1, day, hours, minutes, seconds);
+                  parsed = true;
+                  break;
                 }
-                date = new Date(year, month - 1, day, hours, minutes, seconds);
-                parsed = true;
-                break;
               }
-            }
-            if (!parsed || isNaN(date.getTime())) {
-              errors.push(
-                `Row ${
-                  i + 1
-                }: Invalid date format "${dateStr}" (using current date as default)`
-              );
-              date = new Date();
+              if (!parsed || isNaN(date.getTime())) {
+                errors.push(
+                  `Row ${i + 1}: Invalid date format "${dateStr}" (using current date as default)`
+                );
+                date = new Date();
+              }
             }
           }
         }
@@ -267,7 +272,9 @@ export const calculateDashboardStats = (
       .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
     const byMonth: MonthlyData[] = groupTransactionsByMonth(transactions);
     const recentTransactions = [...transactions]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      )
       .slice(0, 5);
     return {
       totalIncome,
