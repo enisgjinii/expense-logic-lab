@@ -1,0 +1,549 @@
+
+import React, { useState } from 'react';
+import { useFinance } from '@/contexts/FinanceContext';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/components/ui/use-toast';
+import { 
+  Database, 
+  Bell, 
+  Moon, 
+  FileUp, 
+  Download, 
+  Trash2, 
+  Save,
+  UserCog,
+  Laptop,
+  Info,
+  RefreshCw,
+  Sun,
+  Palette,
+  CreditCard
+} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+
+const Settings = () => {
+  const { themeMode, setThemeMode, user } = useFinance();
+  const [activeTab, setActiveTab] = useState('appearance');
+  
+  // Firebase config state (this would connect to your context in a real app)
+  const [firebaseConfig, setFirebaseConfig] = useState({
+    apiKey: '',
+    authDomain: '',
+    projectId: '',
+    storageBucket: '',
+    messagingSenderId: '',
+    appId: ''
+  });
+  
+  // Notification settings
+  const [notifications, setNotifications] = useState({
+    emailAlerts: true,
+    pushNotifications: false,
+    weeklyReport: true,
+    budgetAlerts: true
+  });
+  
+  // Appearance settings
+  const [appearance, setAppearance] = useState({
+    compactMode: false,
+    animationsEnabled: true,
+    highContrastMode: false,
+    fontsize: 'medium'
+  });
+  
+  // Import/Export settings
+  const [importSettings, setImportSettings] = useState({
+    defaultDateFormat: 'MM/DD/YYYY',
+    skipHeaderRow: true,
+    autoDetectColumns: true,
+    defaultCategory: 'Uncategorized'
+  });
+
+  const handleSaveFirebaseConfig = () => {
+    // Save Firebase config
+    toast({
+      title: "Firebase configuration saved",
+      description: "Your Firebase configuration has been updated successfully."
+    });
+  };
+
+  const handleResetSettings = () => {
+    // Reset all settings
+    toast({
+      title: "Settings reset",
+      description: "All settings have been reset to their default values."
+    });
+  };
+
+  const handleUpdateSettings = (type: string) => {
+    toast({
+      title: `${type} settings updated`,
+      description: `Your ${type.toLowerCase()} settings have been updated successfully.`
+    });
+  };
+
+  return (
+    <div className="space-y-6 pb-10 animate-in">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="text-muted-foreground">Manage your account settings and preferences</p>
+        </div>
+        <Badge variant="outline" className="px-2 py-1">
+          {user ? 'Personal account' : 'Not logged in'}
+        </Badge>
+      </div>
+
+      <Tabs defaultValue="appearance" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:w-[600px]">
+          <TabsTrigger value="appearance" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            <span>Appearance</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            <span>Notifications</span>
+          </TabsTrigger>
+          <TabsTrigger value="import" className="flex items-center gap-2">
+            <FileUp className="h-4 w-4" />
+            <span>Import & Export</span>
+          </TabsTrigger>
+          <TabsTrigger value="firebase" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            <span>Firebase</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        {/* Appearance Settings */}
+        <TabsContent value="appearance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Appearance Settings
+              </CardTitle>
+              <CardDescription>
+                Customize how the app looks and feels
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Theme</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <Button 
+                    variant="outline" 
+                    className={`flex-col justify-center items-center gap-2 h-auto py-4 ${themeMode === 'light' ? 'border-primary bg-accent' : ''}`}
+                    onClick={() => setThemeMode('light')}
+                  >
+                    <Sun className="h-6 w-6" />
+                    <span>Light</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className={`flex-col justify-center items-center gap-2 h-auto py-4 ${themeMode === 'dark' ? 'border-primary bg-accent' : ''}`}
+                    onClick={() => setThemeMode('dark')}
+                  >
+                    <Moon className="h-6 w-6" />
+                    <span>Dark</span>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className={`flex-col justify-center items-center gap-2 h-auto py-4 ${themeMode === 'system' ? 'border-primary bg-accent' : ''}`}
+                    onClick={() => setThemeMode('system')}
+                  >
+                    <Laptop className="h-6 w-6" />
+                    <span>System</span>
+                  </Button>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Display Options</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="compact-mode">Compact Mode</Label>
+                      <p className="text-sm text-muted-foreground">Reduces spacing and sizes</p>
+                    </div>
+                    <Switch 
+                      id="compact-mode" 
+                      checked={appearance.compactMode}
+                      onCheckedChange={(checked) => setAppearance({...appearance, compactMode: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="animations">Enable Animations</Label>
+                      <p className="text-sm text-muted-foreground">Show animations throughout the app</p>
+                    </div>
+                    <Switch 
+                      id="animations" 
+                      checked={appearance.animationsEnabled}
+                      onCheckedChange={(checked) => setAppearance({...appearance, animationsEnabled: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="contrast">High Contrast Mode</Label>
+                      <p className="text-sm text-muted-foreground">Increases contrast for better visibility</p>
+                    </div>
+                    <Switch 
+                      id="contrast" 
+                      checked={appearance.highContrastMode}
+                      onCheckedChange={(checked) => setAppearance({...appearance, highContrastMode: checked})}
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="fontsize">Font Size</Label>
+                      <p className="text-sm text-muted-foreground">Change the text size throughout the app</p>
+                    </div>
+                    <Select 
+                      value={appearance.fontsize}
+                      onValueChange={(value) => setAppearance({...appearance, fontsize: value})}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Select size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="small">Small</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="large">Large</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleResetSettings}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset to Defaults
+                </Button>
+                <Button onClick={() => handleUpdateSettings('Appearance')}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Notifications Settings */}
+        <TabsContent value="notifications" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Settings
+              </CardTitle>
+              <CardDescription>
+                Control how you receive alerts and notifications
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="email-alerts">Email Alerts</Label>
+                    <p className="text-sm text-muted-foreground">Receive important notifications via email</p>
+                  </div>
+                  <Switch 
+                    id="email-alerts" 
+                    checked={notifications.emailAlerts}
+                    onCheckedChange={(checked) => setNotifications({...notifications, emailAlerts: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="push-notifications">Push Notifications</Label>
+                    <p className="text-sm text-muted-foreground">Receive notifications in your browser</p>
+                  </div>
+                  <Switch 
+                    id="push-notifications" 
+                    checked={notifications.pushNotifications}
+                    onCheckedChange={(checked) => setNotifications({...notifications, pushNotifications: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="weekly-report">Weekly Reports</Label>
+                    <p className="text-sm text-muted-foreground">Get a summary of your weekly financial activity</p>
+                  </div>
+                  <Switch 
+                    id="weekly-report" 
+                    checked={notifications.weeklyReport}
+                    onCheckedChange={(checked) => setNotifications({...notifications, weeklyReport: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="budget-alerts">Budget Alerts</Label>
+                    <p className="text-sm text-muted-foreground">Be notified when you approach budget limits</p>
+                  </div>
+                  <Switch 
+                    id="budget-alerts" 
+                    checked={notifications.budgetAlerts}
+                    onCheckedChange={(checked) => setNotifications({...notifications, budgetAlerts: checked})}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleResetSettings}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset to Defaults
+                </Button>
+                <Button onClick={() => handleUpdateSettings('Notification')}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Import & Export Settings */}
+        <TabsContent value="import" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileUp className="h-5 w-5" />
+                Import & Export Settings
+              </CardTitle>
+              <CardDescription>
+                Configure how data is imported and exported
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">CSV Import Settings</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="date-format">Default Date Format</Label>
+                    <Select 
+                      value={importSettings.defaultDateFormat}
+                      onValueChange={(value) => setImportSettings({...importSettings, defaultDateFormat: value})}
+                    >
+                      <SelectTrigger id="date-format">
+                        <SelectValue placeholder="Select format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                        <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                        <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="default-category">Default Category</Label>
+                    <Input 
+                      id="default-category" 
+                      value={importSettings.defaultCategory}
+                      onChange={(e) => setImportSettings({...importSettings, defaultCategory: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="skip-header">Skip Header Row</Label>
+                    <p className="text-sm text-muted-foreground">First row of CSV contains column names</p>
+                  </div>
+                  <Switch 
+                    id="skip-header" 
+                    checked={importSettings.skipHeaderRow}
+                    onCheckedChange={(checked) => setImportSettings({...importSettings, skipHeaderRow: checked})}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-detect">Auto-detect Columns</Label>
+                    <p className="text-sm text-muted-foreground">Try to automatically map CSV columns</p>
+                  </div>
+                  <Switch 
+                    id="auto-detect" 
+                    checked={importSettings.autoDetectColumns}
+                    onCheckedChange={(checked) => setImportSettings({...importSettings, autoDetectColumns: checked})}
+                  />
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Data Management</h3>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button variant="outline" className="flex-1">
+                    <Download className="mr-2 h-4 w-4" />
+                    Export All Data
+                  </Button>
+                  <Button variant="outline" className="flex-1">
+                    <FileUp className="mr-2 h-4 w-4" />
+                    Import Data
+                  </Button>
+                  <Button variant="outline" className="flex-1" onClick={() => {
+                    if (confirm("Are you sure you want to clear all data? This cannot be undone.")) {
+                      // Clear data logic
+                      toast({
+                        title: "Data cleared",
+                        description: "All your data has been removed.",
+                        variant: "destructive"
+                      });
+                    }
+                  }}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear All Data
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={handleResetSettings}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset to Defaults
+                </Button>
+                <Button onClick={() => handleUpdateSettings('Import')}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Firebase Settings */}
+        <TabsContent value="firebase" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Firebase Configuration
+              </CardTitle>
+              <CardDescription>
+                Set up your Firebase project for data storage and authentication
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
+                <Info className="h-5 w-5 text-amber-500" />
+                <p className="text-sm text-amber-800 dark:text-amber-300">
+                  Your Firebase credentials are used to connect to your Firebase project. These settings are stored locally.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <Input 
+                    id="api-key" 
+                    value={firebaseConfig.apiKey}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, apiKey: e.target.value})}
+                    placeholder="Your Firebase API key"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="auth-domain">Auth Domain</Label>
+                  <Input 
+                    id="auth-domain" 
+                    value={firebaseConfig.authDomain}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, authDomain: e.target.value})}
+                    placeholder="yourproject.firebaseapp.com"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="project-id">Project ID</Label>
+                  <Input 
+                    id="project-id" 
+                    value={firebaseConfig.projectId}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, projectId: e.target.value})}
+                    placeholder="your-project-id"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="storage-bucket">Storage Bucket</Label>
+                  <Input 
+                    id="storage-bucket" 
+                    value={firebaseConfig.storageBucket}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, storageBucket: e.target.value})}
+                    placeholder="yourproject.appspot.com"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="messaging-sender-id">Messaging Sender ID</Label>
+                  <Input 
+                    id="messaging-sender-id" 
+                    value={firebaseConfig.messagingSenderId}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, messagingSenderId: e.target.value})}
+                    placeholder="123456789012"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="app-id">App ID</Label>
+                  <Input 
+                    id="app-id" 
+                    value={firebaseConfig.appId}
+                    onChange={(e) => setFirebaseConfig({...firebaseConfig, appId: e.target.value})}
+                    placeholder="1:123456789012:web:abc123def456"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setFirebaseConfig({
+                    apiKey: '',
+                    authDomain: '',
+                    projectId: '',
+                    storageBucket: '',
+                    messagingSenderId: '',
+                    appId: ''
+                  });
+                }}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Clear All Fields
+                </Button>
+                <Button onClick={handleSaveFirebaseConfig}>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Configuration
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+            <Info className="h-5 w-5 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Need help setting up Firebase? <a href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noopener noreferrer" className="text-primary underline">Check the documentation</a>.
+            </p>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default Settings;
