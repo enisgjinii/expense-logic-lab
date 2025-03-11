@@ -95,7 +95,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
       const matchesSearch = [
         tx.account.toLowerCase(),
         tx.category.toLowerCase(),
-        (tx.notes ?? '').toLowerCase()
+        (tx.note ?? '').toLowerCase()
       ].some(str => str.includes(searchTerm.toLowerCase()));
 
       const matchesType = typeFilter ? tx.type === typeFilter : true;
@@ -172,7 +172,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
         (tx.type === 'Income' ? '+' : '-') + tx.amount,
         tx.type,
         (tx.payment_type ?? 'TRANSFER').replace('_', ' '),
-        tx.notes ?? ''
+        tx.note ?? ''
       ];
       csvRows.push(row.join(','));
     });
@@ -443,7 +443,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                        {tx.notes || '-'}
+                        {tx.note || '-'}
                       </TableCell>
                     </TableRow>
                   ))
