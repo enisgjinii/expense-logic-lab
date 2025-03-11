@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -19,40 +19,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { 
   Search,
   SlidersHorizontal,
   SortAsc,
@@ -61,17 +31,10 @@ import {
   Coins,
   Wallet,
   ArrowLeftRight,
-  Download,
-  Plus,
-  MoreHorizontal,
-  Pencil,
-  Trash,
-  CheckCircle,
-  XCircle
+  Download
 } from 'lucide-react';
 import { Transaction } from '@/types/finance';
 import { formatCurrency, formatDate } from '@/utils/finance-utils';
-import { toast } from '@/components/ui/use-toast';
 
 // Render a small icon based on payment type
 const PaymentTypeIcon = ({ type }: { type: string }) => {
@@ -88,170 +51,11 @@ const PaymentTypeIcon = ({ type }: { type: string }) => {
   }
 };
 
-// Transaction form component
-const TransactionForm = ({ 
-  transaction, 
-  onSubmit, 
-  accounts 
-}: { 
-  transaction?: Transaction, 
-  onSubmit: (data: Partial<Transaction>) => void,
-  accounts: string[]
-}) => {
-  const isEdit = !!transaction;
-  const [formData, setFormData] = useState<Partial<Transaction>>(
-    transaction || {
-      date: new Date().toISOString().split('T')[0],
-      type: 'Expense',
-      payment_type: 'CREDIT_CARD',
-      amount: 0
-    }
-  );
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? parseFloat(value) || 0 : value }));
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="date">Date</Label>
-          <Input
-            id="date"
-            name="date"
-            type="date"
-            value={formData.date?.toString().split('T')[0]}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="type">Type</Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value) => handleSelectChange('type', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Income">Income</SelectItem>
-              <SelectItem value="Expense">Expense</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="amount">Amount</Label>
-          <Input
-            id="amount"
-            name="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.amount}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="payment_type">Payment Method</Label>
-          <Select
-            value={formData.payment_type}
-            onValueChange={(value) => handleSelectChange('payment_type', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select payment method" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CASH">Cash</SelectItem>
-              <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
-              <SelectItem value="DEBIT_CARD">Debit Card</SelectItem>
-              <SelectItem value="TRANSFER">Transfer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="category">Category</Label>
-          <Input
-            id="category"
-            name="category"
-            value={formData.category || ''}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="account">Account</Label>
-          <Select
-            value={formData.account}
-            onValueChange={(value) => handleSelectChange('account', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select account" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map(acc => (
-                <SelectItem key={acc} value={acc}>{acc}</SelectItem>
-              ))}
-              <SelectItem value="new">+ Add New Account</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="notes">Notes</Label>
-        <Textarea
-          id="notes"
-          name="notes"
-          value={formData.notes || ''}
-          onChange={handleChange}
-          rows={3}
-        />
-      </div>
-
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button variant="outline">Cancel</Button>
-        </DialogClose>
-        <Button 
-          type="submit" 
-          onClick={(e) => {
-            e.preventDefault();
-            onSubmit(formData);
-          }}
-        >
-          {isEdit ? 'Update' : 'Add'} Transaction
-        </Button>
-      </DialogFooter>
-    </div>
-  );
-};
-
 interface TransactionsTableProps {
   transactions: Transaction[];
-  onAddTransaction?: (transaction: Partial<Transaction>) => void;
-  onUpdateTransaction?: (id: string, transaction: Partial<Transaction>) => void;
-  onDeleteTransaction?: (id: string) => void;
 }
 
-const TransactionsTable: React.FC<TransactionsTableProps> = ({ 
-  transactions,
-  onAddTransaction = () => {},
-  onUpdateTransaction = () => {},
-  onDeleteTransaction = () => {}
-}) => {
+const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<keyof Transaction>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -261,12 +65,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
-  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
-  const [selectedTransactions, setSelectedTransactions] = useState<Set<string>>(new Set());
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const pageSize = 10;
 
   // Precompute summary totals
@@ -388,81 +186,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
     document.body.removeChild(link);
   };
 
-  // CRUD Operations
-  const handleAddTransaction = (data: Partial<Transaction>) => {
-    onAddTransaction(data);
-    setIsAddDialogOpen(false);
-    toast({
-      title: "Transaction Added",
-      description: "Your new transaction has been added successfully.",
-      variant: "default"
-    });
-  };
-
-  const handleEditTransaction = (data: Partial<Transaction>) => {
-    if (transactionToEdit?.id) {
-      onUpdateTransaction(transactionToEdit.id, data);
-      setTransactionToEdit(null);
-      setIsEditDialogOpen(false);
-      toast({
-        title: "Transaction Updated",
-        description: "Your transaction has been updated successfully.",
-        variant: "default"
-      });
-    }
-  };
-
-  const confirmDelete = () => {
-    if (transactionToDelete) {
-      onDeleteTransaction(transactionToDelete);
-      setTransactionToDelete(null);
-      setIsDeleteDialogOpen(false);
-      toast({
-        title: "Transaction Deleted",
-        description: "Your transaction has been deleted successfully.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (selectedTransactions.size === 0) return;
-    
-    // Convert Set to Array and delete each transaction
-    Array.from(selectedTransactions).forEach(id => {
-      onDeleteTransaction(id);
-    });
-    
-    setSelectedTransactions(new Set());
-    toast({
-      title: "Transactions Deleted",
-      description: `${selectedTransactions.size} transaction(s) have been deleted successfully.`,
-      variant: "destructive"
-    });
-  };
-
-  const toggleSelectTransaction = useCallback((id: string) => {
-    setSelectedTransactions(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const toggleSelectAll = useCallback(() => {
-    if (selectedTransactions.size === paginatedTransactions.length) {
-      // If all are selected, deselect all
-      setSelectedTransactions(new Set());
-    } else {
-      // Otherwise, select all visible transactions
-      setSelectedTransactions(new Set(paginatedTransactions.map(tx => tx.id)));
-    }
-  }, [paginatedTransactions, selectedTransactions.size]);
-
   return (
     <div className="space-y-6">
       {/* Summary */}
@@ -482,39 +205,10 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-1 h-4 w-4" />
-                Add Transaction
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
-              <DialogHeader>
-                <DialogTitle>Add New Transaction</DialogTitle>
-                <DialogDescription>
-                  Enter the details of your new transaction below.
-                </DialogDescription>
-              </DialogHeader>
-              <TransactionForm 
-                onSubmit={handleAddTransaction} 
-                accounts={allAccounts} 
-              />
-            </DialogContent>
-          </Dialog>
-          
           <Button variant="outline" size="sm" onClick={handleExportCSV}>
             <Download className="mr-1 h-4 w-4" />
             CSV
           </Button>
-          
-          {selectedTransactions.size > 0 && (
-            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-              <Trash className="mr-1 h-4 w-4" />
-              Delete ({selectedTransactions.size})
-            </Button>
-          )}
-          
           <Button variant="outline" size="sm" onClick={resetFilters}>
             Reset Filters
           </Button>
@@ -588,7 +282,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
             >
               Expense {typeFilter === 'Expense' && <span>✓</span>}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuItem className="h-px my-1 p-0" />
 
             {/* Payment */}
             <DropdownMenuItem
@@ -637,7 +331,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               </div>
               {paymentFilter === 'TRANSFER' && <span>✓</span>}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuItem className="h-px my-1 p-0" />
 
             {/* Accounts */}
             <DropdownMenuItem
@@ -659,43 +353,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
         </DropdownMenu>
       </div>
 
-      {/* Edit Transaction Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
-            <DialogDescription>
-              Update the details of your transaction below.
-            </DialogDescription>
-          </DialogHeader>
-          {transactionToEdit && (
-            <TransactionForm 
-              transaction={transactionToEdit}
-              onSubmit={handleEditTransaction} 
-              accounts={allAccounts} 
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Transaction Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the selected transaction.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       {/* Transactions Table */}
       <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
         <CardHeader>
@@ -706,16 +363,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40px]">
-                    <div className="flex items-center justify-center">
-                      <input 
-                        type="checkbox" 
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        checked={selectedTransactions.size === paginatedTransactions.length && paginatedTransactions.length > 0}
-                        onChange={toggleSelectAll}
-                      />
-                    </div>
-                  </TableHead>
                   <TableHead
                     className="w-[120px] cursor-pointer"
                     onClick={() => handleSort('date')}
@@ -751,7 +398,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   <TableHead className="text-right">Type</TableHead>
                   <TableHead className="text-right">Payment</TableHead>
                   <TableHead className="hidden md:table-cell">Notes</TableHead>
-                  <TableHead className="w-[60px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -761,14 +407,6 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                       key={tx.id}
                       className="group hover:bg-accent/30 transition-colors"
                     >
-                      <TableCell className="text-center p-2">
-                        <input 
-                          type="checkbox" 
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                          checked={selectedTransactions.has(tx.id)}
-                          onChange={() => toggleSelectTransaction(tx.id)}
-                        />
-                      </TableCell>
                       <TableCell className="font-medium group-hover:text-primary">
                         {formatDate(tx.date)}
                       </TableCell>
@@ -807,42 +445,11 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                       <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                         {tx.notes || '-'}
                       </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setTransactionToEdit(tx);
-                                setIsEditDialogOpen(true);
-                              }}
-                              className="flex items-center cursor-pointer"
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setTransactionToDelete(tx.id);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                              className="flex items-center cursor-pointer text-destructive"
-                            >
-                              <Trash className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={7} className="h-24 text-center">
                       No transactions found.
                     </TableCell>
                   </TableRow>
@@ -853,49 +460,28 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
 
           {/* Pagination */}
           {sortedTransactions.length > pageSize && (
-            <div className="flex justify-between items-center mt-2 gap-2 p-2">
-              <div className="text-sm text-muted-foreground">
-                Showing {Math.min(startIndex + 1, sortedTransactions.length)} to {Math.min(startIndex + pageSize, sortedTransactions.length)} of {sortedTransactions.length} transactions
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                >
-                  First
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  Prev
-                </Button>
-                <span className="text-sm">
-                  {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setCurrentPage(prev => Math.min(prev + 1, totalPages))
-                  }
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  Last
-                </Button>
-              </div>
+            <div className="flex justify-end items-center mt-2 gap-2 p-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </Button>
+              <span>
+                {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage(prev => Math.min(prev + 1, totalPages))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
             </div>
           )}
         </CardContent>
