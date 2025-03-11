@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { formatCurrency } from '@/utils/finance-utils';
@@ -28,7 +27,6 @@ const Reports = () => {
   
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
   
-  // Generate year options from 2015 to current year
   const years = [];
   for (let year = 2015; year <= new Date().getFullYear(); year++) {
     years.push(year.toString());
@@ -71,7 +69,6 @@ const Reports = () => {
       
       const monthlyData = new Map();
       
-      // Initialize all months based on selected date range
       if (timeRange === 'custom' || timeRange === 'all') {
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -143,7 +140,6 @@ const Reports = () => {
       
       let data = Array.from(monthlyData.values());
       
-      // Sort data by date
       data.sort((a, b) => {
         if (a.year !== b.year) {
           return a.year - b.year;
@@ -151,7 +147,6 @@ const Reports = () => {
         return a.monthIndex - b.monthIndex;
       });
       
-      // Limit data based on time range
       if (timeRange === 'month') {
         data = data.slice(-2);
       } else if (timeRange === 'quarter') {
@@ -463,7 +458,7 @@ const Reports = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stats.accounts.map((account, index) => (
+                  {stats.byAccount.map((account, index) => (
                     <TableRow key={index}>
                       <TableCell>
                         <div className="flex items-center gap-2">
