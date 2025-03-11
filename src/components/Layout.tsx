@@ -389,7 +389,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("light")}
                   >
                     <Sun className="h-3.5 w-3.5" />
-                    <span>Light</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -398,7 +397,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("dark")}
                   >
                     <Moon className="h-3.5 w-3.5" />
-                    <span>Dark</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -407,7 +405,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("system")}
                   >
                     <Laptop className="h-3.5 w-3.5" />
-                    <span>Auto</span>
                   </Button>
                 </div>
               </div>
