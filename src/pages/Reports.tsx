@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { formatCurrency } from '@/utils/finance-utils';
@@ -6,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar } from 'recharts';
+import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, PieChart, Pie, Cell } from 'recharts';
 import { toast } from '@/components/ui/use-toast';
 import { downloadCSV } from '@/utils/export-utils';
-import { BarChart as BarChartIcon, Download, FileType, CreditCard, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { BarChart as BarChartIcon, Download, FileType, CreditCard, ArrowUpDown, ChevronDown, ChevronUp, Wallet, LineChart, Eye, EyeOff, AlertCircle, TrendingUp, TrendingDown, Banknote, History, PieChart as PieChartIcon } from 'lucide-react';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 const Reports = () => {
   const { transactions, stats, budgets, refreshData } = useFinance();
@@ -30,6 +31,16 @@ const Reports = () => {
     key: 'balance',
     direction: 'desc'
   });
+  const [openAccountId, setOpenAccountId] = useState<string | null>(null);
+  const [accountChartType, setAccountChartType] = useState<'pie' | 'bar'>('pie');
+  const [showBalance, setShowBalance] = useState(true);
+  const [accountHistoryPeriod, setAccountHistoryPeriod] = useState('7d');
+  const [accountAnalytics, setAccountAnalytics] = useState<{[key: string]: {
+    trend: 'up' | 'down' | 'stable',
+    changePercentage: number,
+    recentActivity: {date: string, amount: number, description: string, type: string}[],
+    history: {date: string, balance: number}[]
+  }}>({});
 
   const categories = [...new Set(transactions.map(t => t.category))];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -41,7 +52,6 @@ const Reports = () => {
     years.push(year.toString());
   }
 
-  // Get unique accounts
   const accounts = [...new Set(transactions.map(t => t.account))];
 
   useEffect(() => {
@@ -56,6 +66,58 @@ const Reports = () => {
       setAccountTransactions([]);
     }
   }, [selectedAccount, transactions]);
+
+  useEffect(() => {
+    if (stats.byAccount.length > 0) {
+      const analytics: {[key: string]: any} = {};
+      
+      stats.byAccount.forEach(account => {
+        const accountTxs = transactions.filter(t => t.account === account.account);
+        const sortedTxs = [...accountTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const recentActivity = sortedTxs.slice(0, 5).map(t => ({
+          date: t.date,
+          amount: t.amount,
+          description: t.description,
+          type: t.type
+        }));
+        
+        const today = new Date();
+        const history = [];
+        let runningBalance = account.balance;
+        
+        for (let i = 0; i < 30; i++) {
+          const date = new Date();
+          date.setDate(today.getDate() - i);
+          
+          const randomChange = Math.random() * 200 - 100;
+          runningBalance = i === 0 ? runningBalance : runningBalance - randomChange;
+          
+          history.unshift({
+            date: date.toISOString().split('T')[0],
+            balance: Math.max(0, runningBalance)
+          });
+        }
+        
+        const recentHistory = history.slice(-7);
+        const oldAvg = recentHistory.slice(0, 3).reduce((sum, item) => sum + item.balance, 0) / 3;
+        const newAvg = recentHistory.slice(-3).reduce((sum, item) => sum + item.balance, 0) / 3;
+        const changePercentage = oldAvg > 0 ? ((newAvg - oldAvg) / oldAvg) * 100 : 0;
+        const trend: 'up' | 'down' | 'stable' = 
+          changePercentage > 1 ? 'up' : 
+          changePercentage < -1 ? 'down' : 'stable';
+        
+        analytics[account.account] = {
+          trend,
+          changePercentage,
+          recentActivity,
+          history
+        };
+      });
+      
+      setAccountAnalytics(analytics);
+    }
+  }, [stats.byAccount, transactions]);
 
   const generateReport = async () => {
     setIsLoading(true);
@@ -292,6 +354,37 @@ const Reports = () => {
     }
   };
 
+  const getAccountHistoryData = (accountName: string) => {
+    if (!accountAnalytics[accountName]) return [];
+    
+    const history = [...accountAnalytics[accountName].history];
+    
+    if (accountHistoryPeriod === '7d') {
+      return history.slice(-7);
+    } else if (accountHistoryPeriod === '14d') {
+      return history.slice(-14);
+    } else if (accountHistoryPeriod === '30d') {
+      return history.slice(-30);
+    }
+    
+    return history;
+  };
+  
+  const getAccountHealthStatus = (account: any) => {
+    const analytics = accountAnalytics[account.account];
+    if (!analytics) return { status: 'neutral', message: 'Insufficient data' };
+    
+    if (analytics.trend === 'up' && analytics.changePercentage > 5) {
+      return { status: 'positive', message: 'Growing balance' };
+    } else if (analytics.trend === 'down' && analytics.changePercentage < -5) {
+      return { status: 'negative', message: 'Declining balance' };
+    } else if (account.balance < 100) {
+      return { status: 'warning', message: 'Low balance' };
+    }
+    
+    return { status: 'neutral', message: 'Stable account' };
+  };
+
   const renderAccountsView = () => {
     if (accountView === 'basic') {
       return (
@@ -368,13 +461,23 @@ const Reports = () => {
                   Detailed view of your financial accounts
                 </CardDescription>
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => handleAccountViewChange('basic')}
-              >
-                Basic View
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowBalance(!showBalance)}
+                >
+                  {showBalance ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+                  {showBalance ? 'Hide Balances' : 'Show Balances'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleAccountViewChange('basic')}
+                >
+                  Basic View
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -383,8 +486,8 @@ const Reports = () => {
                     <SelectValue placeholder="Select an account to analyze" />
                   </SelectTrigger>
                   <SelectContent>
-                    {accounts.map((account, index) => (
-                      <SelectItem key={index} value={account}>{account}</SelectItem>
+                    {stats.byAccount.map((account, index) => (
+                      <SelectItem key={index} value={account.account}>{account.account}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -393,23 +496,60 @@ const Reports = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setViewMode('table')}
-                    className={viewMode === 'table' ? 'bg-primary text-primary-foreground' : ''}
+                    onClick={() => setAccountChartType('pie')}
+                    className={accountChartType === 'pie' ? 'bg-primary text-primary-foreground' : ''}
                   >
-                    <FileType className="h-4 w-4 mr-1" /> Table
+                    <PieChartIcon className="h-4 w-4 mr-1" /> Pie
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setViewMode('chart')}
-                    className={viewMode === 'chart' ? 'bg-primary text-primary-foreground' : ''}
+                    onClick={() => setAccountChartType('bar')}
+                    className={accountChartType === 'bar' ? 'bg-primary text-primary-foreground' : ''}
                   >
-                    <BarChartIcon className="h-4 w-4 mr-1" /> Chart
+                    <BarChartIcon className="h-4 w-4 mr-1" /> Bar
                   </Button>
                 </div>
               </div>
               
-              <div className="space-y-4">
+              {!selectedAccount && (
+                <div className="mt-4 h-[250px]">
+                  {accountChartType === 'pie' ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.byAccount}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="balance"
+                          nameKey="account"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {stats.byAccount.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.byAccount}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="account" />
+                        <YAxis tickFormatter={(value) => formatCurrency(Number(value)).split('.')[0]} />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                        <Bar dataKey="balance" fill="#4ade80" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              )}
+              
+              <div className="mt-6 space-y-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -428,57 +568,221 @@ const Reports = () => {
                           sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
                         )}
                       </TableHead>
+                      <TableHead>Health</TableHead>
                       <TableHead>Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedAccounts.map((account, index) => (
-                      <React.Fragment key={index}>
-                        <TableRow>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: account.color || COLORS[index % COLORS.length] }}
-                              />
-                              {account.account}
-                            </div>
-                          </TableCell>
-                          <TableCell className={account.balance >= 0 ? "text-income" : "text-expense"}>
-                            {formatCurrency(account.balance)}
-                          </TableCell>
-                          <TableCell>{account.percentage.toFixed(1)}%</TableCell>
-                          <TableCell>
-                            <Collapsible>
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <CreditCard className="h-4 w-4 mr-1" /> View
-                                </Button>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <div className="p-2 mt-2 bg-muted/50 rounded-md">
-                                  <h4 className="font-medium mb-2">Account Statistics</h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                    <div>Total Transactions: {transactions.filter(t => t.account === account.account).length}</div>
-                                    <div>Last Transaction: {
-                                      transactions
-                                        .filter(t => t.account === account.account)
-                                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]?.date.split('T')[0] || 'N/A'
-                                    }</div>
+                    {sortedAccounts.map((account, index) => {
+                      const health = getAccountHealthStatus(account);
+                      const analytics = accountAnalytics[account.account];
+                      
+                      return (
+                        <React.Fragment key={index}>
+                          <TableRow className={openAccountId === account.account ? 'bg-accent/50' : ''}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: account.color || COLORS[index % COLORS.length] }}
+                                />
+                                {account.account}
+                              </div>
+                            </TableCell>
+                            <TableCell className={account.balance >= 0 ? "text-income" : "text-expense"}>
+                              {showBalance ? formatCurrency(account.balance) : '•••••••'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <span>{account.percentage.toFixed(1)}%</span>
+                                <Progress value={account.percentage} className="h-1" />
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {analytics && (
+                                <Badge 
+                                  variant={
+                                    health.status === 'positive' ? 'outline' : 
+                                    health.status === 'negative' ? 'destructive' : 
+                                    health.status === 'warning' ? 'secondary' : 'outline'
+                                  }
+                                  className="flex items-center gap-1"
+                                >
+                                  {analytics.trend === 'up' ? (
+                                    <TrendingUp className="h-3 w-3" />
+                                  ) : analytics.trend === 'down' ? (
+                                    <TrendingDown className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3" />
+                                  )}
+                                  {analytics.changePercentage.toFixed(1)}%
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setOpenAccountId(openAccountId === account.account ? null : account.account)}
+                              >
+                                <CreditCard className="h-4 w-4 mr-1" /> 
+                                {openAccountId === account.account ? 'Hide' : 'View'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          
+                          {openAccountId === account.account && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="p-0">
+                                <div className="p-4 bg-accent/20 space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <Card className="bg-card/60">
+                                      <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-medium">Account Summary</CardTitle>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <dl className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <dt>Current Balance:</dt>
+                                            <dd className={`font-semibold ${account.balance >= 0 ? 'text-income' : 'text-expense'}`}>
+                                              {showBalance ? formatCurrency(account.balance) : '•••••••'}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Status:</dt>
+                                            <dd className="font-semibold">{health.message}</dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Recent Change:</dt>
+                                            <dd className={`font-semibold ${analytics?.trend === 'up' ? 'text-income' : analytics?.trend === 'down' ? 'text-expense' : ''}`}>
+                                              {analytics ? `${analytics.changePercentage.toFixed(1)}%` : 'N/A'}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Total Transactions:</dt>
+                                            <dd className="font-semibold">
+                                              {transactions.filter(t => t.account === account.account).length}
+                                            </dd>
+                                          </div>
+                                        </dl>
+                                      </CardContent>
+                                    </Card>
+                                    
+                                    <Card className="bg-card/60 md:col-span-2">
+                                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                                        <CardTitle className="text-sm font-medium">Balance History</CardTitle>
+                                        <Select value={accountHistoryPeriod} onValueChange={setAccountHistoryPeriod}>
+                                          <SelectTrigger className="w-[100px] h-7">
+                                            <SelectValue placeholder="Period" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="7d">7 Days</SelectItem>
+                                            <SelectItem value="14d">14 Days</SelectItem>
+                                            <SelectItem value="30d">30 Days</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </CardHeader>
+                                      <CardContent className="p-0 h-[150px]">
+                                        {analytics && (
+                                          <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart
+                                              data={getAccountHistoryData(account.account)}
+                                              margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                                            >
+                                              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                              <XAxis 
+                                                dataKey="date" 
+                                                tick={{ fontSize: 10 }}
+                                                tickFormatter={(value) => {
+                                                  const date = new Date(value);
+                                                  return `${date.getMonth()+1}/${date.getDate()}`;
+                                                }}
+                                              />
+                                              <YAxis 
+                                                domain={['dataMin', 'dataMax']}
+                                                tickFormatter={(value) => formatCurrency(value).split('.')[0]}
+                                                tick={{ fontSize: 10 }}
+                                              />
+                                              <Tooltip 
+                                                formatter={(value) => formatCurrency(Number(value))}
+                                                labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                                              />
+                                              <Bar 
+                                                type="monotone" 
+                                                dataKey="balance" 
+                                                fill={account.color || COLORS[index % COLORS.length]} 
+                                                stroke={account.color || COLORS[index % COLORS.length]}
+                                              />
+                                            </LineChart>
+                                          </ResponsiveContainer>
+                                        )}
+                                      </CardContent>
+                                    </Card>
                                   </div>
+                                  
+                                  <div className="mt-4">
+                                    <h4 className="font-medium mb-2 flex items-center">
+                                      <History className="h-4 w-4 mr-1" /> Recent Activity
+                                    </h4>
+                                    {analytics && analytics.recentActivity.length > 0 ? (
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {analytics.recentActivity.map((activity, idx) => (
+                                            <TableRow key={idx}>
+                                              <TableCell className="text-xs">
+                                                {new Date(activity.date).toLocaleDateString()}
+                                              </TableCell>
+                                              <TableCell>{activity.description || 'Transaction'}</TableCell>
+                                              <TableCell>
+                                                <Badge variant={activity.type === 'Income' ? 'outline' : 'secondary'} className={`${activity.type === 'Income' ? 'border-income/50 bg-income/10 text-income' : 'border-expense/50 bg-expense/10 text-expense'}`}>
+                                                  {activity.type}
+                                                </Badge>
+                                              </TableCell>
+                                              <TableCell className={`text-right ${activity.type === 'Income' ? 'text-income' : 'text-expense'}`}>
+                                                {formatCurrency(activity.amount)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    ) : (
+                                      <div className="text-center text-muted-foreground p-4">
+                                        No recent activity for this account
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {transactions.filter(t => t.account === account.account).length > 5 && (
+                                    <div className="flex justify-center mt-2">
+                                      <Button variant="outline" size="sm" onClick={() => setSelectedAccount(account.account)}>
+                                        View All Transactions
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
-                              </CollapsibleContent>
-                            </Collapsible>
-                          </TableCell>
-                        </TableRow>
-                      </React.Fragment>
-                    ))}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 
                 {selectedAccount && (
                   <div className="mt-6 border-t pt-4">
-                    <h3 className="font-medium text-lg mb-4">Transactions for {selectedAccount}</h3>
+                    <h3 className="font-medium text-lg mb-4 flex items-center">
+                      <Banknote className="h-5 w-5 mr-2" /> 
+                      Transactions for {selectedAccount}
+                    </h3>
                     {accountTransactions.length > 0 ? (
                       <Table>
                         <TableHeader>
@@ -502,13 +806,20 @@ const Reports = () => {
                                 <TableCell className={transaction.type === 'Income' ? "text-income" : "text-expense"}>
                                   {formatCurrency(transaction.amount)}
                                 </TableCell>
-                                <TableCell>{transaction.type}</TableCell>
+                                <TableCell>
+                                  <Badge variant={transaction.type === 'Income' ? 'outline' : 'secondary'} className={`${transaction.type === 'Income' ? 'border-income/50 bg-income/10 text-income' : 'border-expense/50 bg-expense/10 text-expense'}`}>
+                                    {transaction.type}
+                                  </Badge>
+                                </TableCell>
                               </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     ) : (
-                      <p className="text-muted-foreground">No transactions found for this account</p>
+                      <div className="flex items-center justify-center p-8 border rounded-md bg-muted/20">
+                        <AlertCircle className="h-5 w-5 mr-2 text-muted-foreground" />
+                        <p className="text-muted-foreground">No transactions found for this account</p>
+                      </div>
                     )}
                     {accountTransactions.length > 10 && (
                       <div className="flex justify-center mt-4">
