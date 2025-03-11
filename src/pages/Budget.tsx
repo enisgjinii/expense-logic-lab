@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const BudgetPage: React.FC = () => {
   const { budgets, budgetSummaries, transactions, addBudget, deleteBudget, updateBudget } = useFinance();
   
-  // State for new budget form
   const [newBudget, setNewBudget] = useState<Omit<Budget, 'id'>>({
     category: '',
     name: '',
@@ -29,12 +27,10 @@ const BudgetPage: React.FC = () => {
   });
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   
-  // Extract unique categories from transactions
   const uniqueCategories = Array.from(
     new Set(transactions.filter(t => t.type === 'Expense').map(t => t.category))
   ).sort();
   
-  // Filter categories that don't already have budgets
   const availableCategories = uniqueCategories.filter(
     category => !budgets.some(budget => budget.category === category)
   );
@@ -99,7 +95,6 @@ const BudgetPage: React.FC = () => {
       description: `Budget for ${newBudget.category} has been created`
     });
     
-    // Reset form
     setNewBudget({
       category: '',
       name: '',
@@ -264,7 +259,7 @@ const BudgetPage: React.FC = () => {
                       <Progress 
                         value={summary.percentage > 100 ? 100 : summary.percentage} 
                         className="h-2" 
-                        indicatorClassName={getBudgetStatusColor(summary.percentage)}
+                        indicatorColor={getBudgetStatusColor(summary.percentage)}
                       />
                     </div>
                     

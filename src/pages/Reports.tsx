@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { formatCurrency } from '@/utils/finance-utils';
@@ -23,7 +22,6 @@ const Reports = () => {
   const categories = [...new Set(transactions.map(t => t.category))];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  // Color palette for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
   useEffect(() => {
@@ -34,11 +32,9 @@ const Reports = () => {
     setIsLoading(true);
     
     try {
-      // Get current date
       const now = new Date();
       let startDate = new Date();
       
-      // Set time range
       if (timeRange === 'month') {
         startDate.setMonth(now.getMonth() - 1);
       } else if (timeRange === 'quarter') {
@@ -46,10 +42,9 @@ const Reports = () => {
       } else if (timeRange === 'year') {
         startDate.setFullYear(now.getFullYear() - 1);
       } else if (timeRange === 'all') {
-        startDate = new Date(0); // Beginning of time
+        startDate = new Date(0);
       }
       
-      // Filter transactions by date and category
       let filteredTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
         const meetsDateCriteria = transactionDate >= startDate && transactionDate <= now;
@@ -63,9 +58,7 @@ const Reports = () => {
       
       let data: any[] = [];
       
-      // Format data based on report type
       if (chartType === 'pie') {
-        // Group by category for pie chart
         const categoryMap = new Map();
         
         filteredTransactions.forEach(t => {
@@ -80,19 +73,16 @@ const Reports = () => {
         categoryMap.forEach((amount, category) => {
           data.push({
             name: category,
-            value: Math.abs(amount), // Always positive for pie chart
-            originalValue: amount // Keep original sign for tooltips
+            value: Math.abs(amount),
+            originalValue: amount
           });
         });
         
-        // Sort by value
         data.sort((a, b) => b.value - a.value);
         
       } else {
-        // Group by month for line/bar charts
         const monthlyData = new Map();
         
-        // Initialize with all months
         if (timeRange === 'year' || timeRange === 'all') {
           months.forEach(month => {
             monthlyData.set(month, { 
@@ -130,7 +120,6 @@ const Reports = () => {
           monthlyData.set(month, monthData);
         });
         
-        // Convert map to array and sort by month sequence
         data = Array.from(monthlyData.values());
         const currentMonthIndex = now.getMonth();
         
@@ -138,14 +127,12 @@ const Reports = () => {
           const aIndex = months.indexOf(a.name);
           const bIndex = months.indexOf(b.name);
           
-          // Handle year wrap-around
           const adjustedAIndex = aIndex <= currentMonthIndex ? aIndex + 12 : aIndex;
           const adjustedBIndex = bIndex <= currentMonthIndex ? bIndex + 12 : bIndex;
           
           return adjustedAIndex - adjustedBIndex;
         });
         
-        // Take only the last N months based on time range
         if (timeRange === 'month') {
           data = data.slice(-2);
         } else if (timeRange === 'quarter') {
@@ -230,15 +217,15 @@ const Reports = () => {
               ))}
             </Pie>
             <Tooltip 
-              formatter={(value: number) => formatCurrency(value)}
+              formatter={(value: any) => formatCurrency(Number(value))}
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   return (
                     <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3">
                       <p className="font-medium">{payload[0].name}</p>
-                      <p className="text-lg font-semibold">{formatCurrency(payload[0].value)}</p>
+                      <p className="text-lg font-semibold">{formatCurrency(Number(payload[0].value))}</p>
                       <p className="text-xs text-muted-foreground">
-                        {(payload[0].payload.value / reportData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
+                        {(Number(payload[0].payload.value) / reportData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
                       </p>
                     </div>
                   );
@@ -255,8 +242,8 @@ const Reports = () => {
           <LineChart data={reportData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
-            <YAxis tickFormatter={(value) => formatCurrency(value).split('.')[0]} />
-            <Tooltip formatter={(value) => formatCurrency(value)} />
+            <YAxis tickFormatter={(value: any) => formatCurrency(Number(value)).split('.')[0]} />
+            <Tooltip formatter={(value: any) => formatCurrency(Number(value))} />
             <Legend />
             <Line type="monotone" dataKey="income" stroke="#4ade80" strokeWidth={2} activeDot={{ r: 8 }} name="Income" />
             <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} activeDot={{ r: 8 }} name="Expense" />
