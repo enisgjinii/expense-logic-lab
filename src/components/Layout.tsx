@@ -21,7 +21,6 @@ import {
   Moon,
   Sun,
   Laptop,
-  Bell,
   HelpCircle
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
@@ -48,8 +47,8 @@ const SidebarItem = ({ icon, label, to, isActive, count, isCollapsed }: SidebarI
             <Button 
               variant="ghost" 
               className={cn(
-                "w-full justify-start gap-3 p-3 font-normal relative",
-                isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                "w-full justify-start gap-3 p-3 font-normal relative transition-all duration-200 hover:bg-primary/10",
+                isActive ? "bg-primary/15 text-primary" : "hover:bg-accent/50"
               )}
             >
               <div className={cn("flex items-center gap-3", isCollapsed && "justify-center w-full")}>
@@ -61,7 +60,7 @@ const SidebarItem = ({ icon, label, to, isActive, count, isCollapsed }: SidebarI
                   </Badge>
                 )}
               </div>
-              {isActive && <div className="absolute right-0 top-1/2 w-1 h-8 bg-primary rounded-l-md transform -translate-y-1/2" />}
+              {isActive && <div className="absolute left-0 top-1/2 w-1 h-8 bg-primary rounded-r-md transform -translate-y-1/2" />}
             </Button>
           </Link>
         </TooltipTrigger>
@@ -77,7 +76,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, themeMode, setThemeMode } = useFinance();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [notifications, setNotifications] = useState<number>(3);
   
   const navigationItems = [
     {
@@ -150,7 +148,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     if (savedState !== null) {
       setIsCollapsed(savedState === 'true');
     }
-  }, []);
+    
+    // Close mobile menu when location changes
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   // Theme switcher component for mobile dropdown
   const MobileThemeSwitcher = () => (
@@ -186,58 +187,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             
             <div className="flex items-center gap-2">
               {user && (
-                <>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-                          <Bell className="h-5 w-5" />
-                          {notifications > 0 && (
-                            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                              {notifications}
-                            </span>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Notifications</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
-                        <UserCircle className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <div className="flex items-center justify-start gap-2 p-2">
-                        <div className="rounded-full bg-primary/10 p-1">
-                          <UserCircle className="h-8 w-8 text-primary" />
-                        </div>
-                        <div className="flex flex-col space-y-0.5">
-                          <p className="text-sm font-medium">{user.email}</p>
-                          <p className="text-xs text-muted-foreground">User Account</p>
-                        </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
+                      <UserCircle className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="flex items-center justify-start gap-2 p-2">
+                      <div className="rounded-full bg-primary/10 p-1">
+                        <UserCircle className="h-8 w-8 text-primary" />
                       </div>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/profile')}>
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate('/settings')}>
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Settings</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleLogout}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Logout</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <MobileThemeSwitcher />
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
+                      <div className="flex flex-col space-y-0.5">
+                        <p className="text-sm font-medium">{user.email}</p>
+                        <p className="text-xs text-muted-foreground">User Account</p>
+                      </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <MobileThemeSwitcher />
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               
               <Button 
@@ -259,7 +242,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       {/* Mobile Navigation Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-30 bg-background md:hidden animate-in">
+        <div className="fixed inset-0 z-30 bg-background/95 backdrop-blur-sm md:hidden animate-in">
           <div className="container pt-20 pb-8">
             <nav className="flex flex-col gap-1">
               {navigationItems.map((item, index) => (
@@ -315,7 +298,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className="flex-1 flex md:container md:pt-4">
         {/* Desktop Sidebar */}
         <aside className={cn(
-          "hidden md:flex flex-col gap-6 border-r pt-4 transition-all duration-300",
+          "hidden md:flex flex-col gap-6 border-r pt-4 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-[70px]" : "w-64"
         )}>
           <div className={cn(
@@ -335,7 +318,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               variant="ghost" 
               size="icon" 
               onClick={toggleSidebar} 
-              className={cn("ml-auto", isCollapsed && "ml-0")}
+              className={cn("ml-auto hover:bg-primary/10", isCollapsed && "ml-0")}
             >
               <ChevronRight className={cn("h-5 w-5 transition-transform", isCollapsed && "rotate-180")} />
             </Button>
@@ -371,7 +354,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Button 
                 variant="ghost" 
                 className={cn(
-                  "justify-start gap-3 p-3 font-normal mt-1",
+                  "justify-start gap-3 p-3 font-normal mt-1 hover:bg-primary/10",
                   isCollapsed && "justify-center"
                 )}
                 onClick={handleLogout}
@@ -384,7 +367,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Button 
                   variant="ghost" 
                   className={cn(
-                    "w-full justify-start gap-3 p-3 font-normal",
+                    "w-full justify-start gap-3 p-3 font-normal hover:bg-primary/10",
                     isCollapsed && "justify-center"
                   )}
                 >
@@ -466,6 +449,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            
+            <div className="mt-4 flex justify-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="opacity-60 hover:opacity-100">
+                      <HelpCircle className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Help & Support</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </aside>
         
