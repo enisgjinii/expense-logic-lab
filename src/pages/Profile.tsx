@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,47 +23,190 @@ import {
   LogOut,
   CreditCard,
   Building,
-  Check
+  Check,
+  Loader2
 } from 'lucide-react';
+import { getFirestore, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { getAuth, updateEmail, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const Profile = () => {
-  const { user, logout } = useFinance();
+  const { user, logout, transactions } = useFinance();
+  const db = getFirestore();
+  const auth = getAuth();
+  const storage = getStorage();
   
+  const [isLoading, setIsLoading] = useState(true);
   const [profileData, setProfileData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: user?.email || 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
+    firstName: '',
+    lastName: '',
+    email: user?.email || '',
+    phone: '',
     currency: 'USD',
     language: 'en',
-    occupation: 'Software Developer',
-    company: 'Tech Corp',
+    occupation: '',
+    company: '',
     avatarUrl: '', // Leave empty to use initials
   });
   
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
   
-  const [accountActivity] = useState([
-    { action: 'Login', device: 'Chrome on Windows', location: 'New York, US', date: '2023-10-15 14:23' },
-    { action: 'Password Changed', device: 'Chrome on Windows', location: 'New York, US', date: '2023-10-01 09:30' },
-    { action: 'Login', device: 'Safari on iPhone', location: 'New York, US', date: '2023-09-28 18:45' },
+  const [accountActivity, setAccountActivity] = useState([
+    { action: 'Login', device: 'Chrome on Windows', location: 'New York, US', date: new Date().toISOString() },
   ]);
   
-  const handleUpdateProfile = () => {
-    // Update profile logic
-    setIsEditing(false);
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been updated successfully."
-    });
+  useEffect(() => {
+    fetchUserProfile();
+  }, [user]);
+  
+  const fetchUserProfile = async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setProfileData({
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          email: user.email || '',
+          phone: userData.phone || '',
+          currency: userData.currency || 'USD',
+          language: userData.language || 'en',
+          occupation: userData.occupation || '',
+          company: userData.company || '',
+          avatarUrl: userData.avatarUrl || '',
+        });
+        
+        // Fetch activity if available
+        if (userData.activity && Array.isArray(userData.activity)) {
+          setAccountActivity(userData.activity);
+        }
+      } else {
+        // Create a new profile document if it doesn't exist
+        const initialProfile = {
+          firstName: 'New',
+          lastName: 'User',
+          phone: '',
+          currency: 'USD',
+          language: 'en',
+          occupation: '',
+          company: '',
+          avatarUrl: '',
+          activity: [{
+            action: 'Account Created',
+            device: getBrowserInfo(),
+            location: 'Unknown',
+            date: new Date().toISOString()
+          }]
+        };
+        
+        await setDoc(userDocRef, initialProfile);
+        setProfileData({
+          ...initialProfile,
+          email: user.email || '',
+        });
+        setAccountActivity(initialProfile.activity);
+      }
+    } catch (error: any) {
+      console.error('Error fetching user profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const handleChangePassword = () => {
+  const getBrowserInfo = () => {
+    const userAgent = navigator.userAgent;
+    let browserName;
+    
+    if (userAgent.match(/chrome|chromium|crios/i)) {
+      browserName = "Chrome";
+    } else if (userAgent.match(/firefox|fxios/i)) {
+      browserName = "Firefox";
+    } else if (userAgent.match(/safari/i)) {
+      browserName = "Safari";
+    } else if (userAgent.match(/opr\//i)) {
+      browserName = "Opera";
+    } else if (userAgent.match(/edg/i)) {
+      browserName = "Edge";
+    } else {
+      browserName = "Unknown";
+    }
+    
+    const platform = navigator.platform;
+    
+    return `${browserName} on ${platform}`;
+  };
+  
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    
+    setIsSaving(true);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      
+      // Update Firestore
+      await updateDoc(userDocRef, {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phone: profileData.phone,
+        currency: profileData.currency,
+        language: profileData.language,
+        occupation: profileData.occupation,
+        company: profileData.company,
+        avatarUrl: profileData.avatarUrl,
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Log this activity
+      const newActivity = {
+        action: 'Profile Updated',
+        device: getBrowserInfo(),
+        location: 'Unknown',
+        date: new Date().toISOString()
+      };
+      
+      const updatedActivity = [newActivity, ...accountActivity.slice(0, 9)];
+      await updateDoc(userDocRef, { activity: updatedActivity });
+      setAccountActivity(updatedActivity);
+      
+      setIsEditing(false);
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been updated successfully."
+      });
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update profile",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleChangePassword = async () => {
+    if (!user || !user.email) return;
+    
     // Validate passwords
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({
@@ -74,32 +217,101 @@ const Profile = () => {
       return;
     }
     
-    // Change password logic
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    });
-    
-    toast({
-      title: "Password changed",
-      description: "Your password has been updated successfully."
-    });
+    setIsSaving(true);
+    try {
+      // Re-authenticate the user
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        passwordData.currentPassword
+      );
+      
+      await reauthenticateWithCredential(user, credential);
+      
+      // Change password
+      await updatePassword(user, passwordData.newPassword);
+      
+      // Log this activity
+      const userDocRef = doc(db, 'users', user.uid);
+      const newActivity = {
+        action: 'Password Changed',
+        device: getBrowserInfo(),
+        location: 'Unknown',
+        date: new Date().toISOString()
+      };
+      
+      const updatedActivity = [newActivity, ...accountActivity.slice(0, 9)];
+      await updateDoc(userDocRef, { activity: updatedActivity });
+      setAccountActivity(updatedActivity);
+      
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      
+      toast({
+        title: "Password changed",
+        description: "Your password has been updated successfully."
+      });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast({
+        title: "Password change failed",
+        description: error.message || "Failed to change password",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
   
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Handle avatar upload
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
+    
     const file = e.target.files?.[0];
-    if (file) {
-      // In a real app, you'd upload this file to storage
-      // For demo, we'll use a local URL
-      const imageUrl = URL.createObjectURL(file);
-      setProfileData({...profileData, avatarUrl: imageUrl});
+    if (!file) return;
+    
+    setIsSaving(true);
+    try {
+      // Upload to Firebase Storage
+      const storageRef = ref(storage, `users/${user.uid}/avatar`);
+      await uploadBytes(storageRef, file);
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      // Update profile data
+      setProfileData({...profileData, avatarUrl: downloadURL});
+      
+      // Update Firestore
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, { avatarUrl: downloadURL });
+      
+      // Log this activity
+      const newActivity = {
+        action: 'Avatar Updated',
+        device: getBrowserInfo(),
+        location: 'Unknown',
+        date: new Date().toISOString()
+      };
+      
+      const updatedActivity = [newActivity, ...accountActivity.slice(0, 9)];
+      await updateDoc(userDocRef, { activity: updatedActivity });
+      setAccountActivity(updatedActivity);
       
       toast({
         title: "Avatar updated",
         description: "Your profile picture has been updated successfully."
       });
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload avatar",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -107,6 +319,33 @@ const Profile = () => {
   const getInitials = () => {
     return `${profileData.firstName.charAt(0)}${profileData.lastName.charAt(0)}`;
   };
+  
+  // Get account stats
+  const getAccountStats = () => {
+    if (!transactions) return { accounts: 0, transactions: 0, categories: 0 };
+    
+    const uniqueAccounts = new Set(transactions.map(t => t.account));
+    const uniqueCategories = new Set(transactions.map(t => t.category));
+    
+    return {
+      accounts: uniqueAccounts.size,
+      transactions: transactions.length,
+      categories: uniqueCategories.size
+    };
+  };
+  
+  const stats = getAccountStats();
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-[80vh]">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6 pb-10 animate-in">
@@ -126,6 +365,7 @@ const Profile = () => {
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsEditing(!isEditing)}
+                disabled={isSaving}
               >
                 <Edit className="h-4 w-4" />
               </Button>
@@ -149,6 +389,7 @@ const Profile = () => {
                       accept="image/*" 
                       className="hidden" 
                       onChange={handleAvatarUpload}
+                      disabled={isSaving}
                     />
                   </label>
                 </div>
@@ -180,7 +421,24 @@ const Profile = () => {
               <Building className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div>
                 <p className="font-medium">Company</p>
-                <p className="text-sm text-muted-foreground">{profileData.company}</p>
+                <p className="text-sm text-muted-foreground">{profileData.company || 'Not specified'}</p>
+              </div>
+            </div>
+            
+            <Separator className="my-2" />
+            
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="space-y-1">
+                <p className="text-2xl font-bold">{stats.accounts}</p>
+                <p className="text-xs text-muted-foreground">Accounts</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl font-bold">{stats.transactions}</p>
+                <p className="text-xs text-muted-foreground">Transactions</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl font-bold">{stats.categories}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
               </div>
             </div>
           </CardContent>
@@ -189,6 +447,7 @@ const Profile = () => {
               variant="destructive" 
               onClick={logout}
               className="w-full"
+              disabled={isSaving}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Logout
@@ -231,7 +490,7 @@ const Profile = () => {
                         id="firstName" 
                         value={profileData.firstName} 
                         onChange={(e) => setProfileData({...profileData, firstName: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       />
                     </div>
                     <div className="space-y-2">
@@ -240,7 +499,7 @@ const Profile = () => {
                         id="lastName" 
                         value={profileData.lastName} 
                         onChange={(e) => setProfileData({...profileData, lastName: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       />
                     </div>
                   </div>
@@ -252,8 +511,7 @@ const Profile = () => {
                         id="email" 
                         type="email"
                         value={profileData.email} 
-                        onChange={(e) => setProfileData({...profileData, email: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={true} // Email can only be changed via auth flow
                       />
                     </div>
                     <div className="space-y-2">
@@ -262,7 +520,7 @@ const Profile = () => {
                         id="phone" 
                         value={profileData.phone} 
                         onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       />
                     </div>
                   </div>
@@ -276,7 +534,7 @@ const Profile = () => {
                         id="occupation" 
                         value={profileData.occupation} 
                         onChange={(e) => setProfileData({...profileData, occupation: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       />
                     </div>
                     <div className="space-y-2">
@@ -285,7 +543,7 @@ const Profile = () => {
                         id="company" 
                         value={profileData.company} 
                         onChange={(e) => setProfileData({...profileData, company: e.target.value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       />
                     </div>
                   </div>
@@ -296,7 +554,7 @@ const Profile = () => {
                       <Select 
                         value={profileData.currency}
                         onValueChange={(value) => setProfileData({...profileData, currency: value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       >
                         <SelectTrigger id="currency" className="w-full">
                           <SelectValue placeholder="Select currency" />
@@ -314,7 +572,7 @@ const Profile = () => {
                       <Select 
                         value={profileData.language}
                         onValueChange={(value) => setProfileData({...profileData, language: value})}
-                        disabled={!isEditing}
+                        disabled={!isEditing || isSaving}
                       >
                         <SelectTrigger id="language" className="w-full">
                           <SelectValue placeholder="Select language" />
@@ -332,16 +590,25 @@ const Profile = () => {
                 <CardFooter className="flex justify-end gap-2">
                   {isEditing ? (
                     <>
-                      <Button variant="outline" onClick={() => setIsEditing(false)}>
+                      <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
                         Cancel
                       </Button>
-                      <Button onClick={handleUpdateProfile}>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
+                      <Button onClick={handleUpdateProfile} disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Changes
+                          </>
+                        )}
                       </Button>
                     </>
                   ) : (
-                    <Button onClick={() => setIsEditing(true)}>
+                    <Button onClick={() => setIsEditing(true)} disabled={isSaving}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Profile
                     </Button>
@@ -370,6 +637,7 @@ const Profile = () => {
                         type="password"
                         value={passwordData.currentPassword}
                         onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                        disabled={isSaving}
                       />
                     </div>
                     
@@ -381,6 +649,7 @@ const Profile = () => {
                           type="password"
                           value={passwordData.newPassword}
                           onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                          disabled={isSaving}
                         />
                       </div>
                       <div className="space-y-2">
@@ -390,6 +659,7 @@ const Profile = () => {
                           type="password"
                           value={passwordData.confirmPassword}
                           onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                          disabled={isSaving}
                         />
                       </div>
                     </div>
@@ -397,13 +667,23 @@ const Profile = () => {
                     <Button 
                       onClick={handleChangePassword}
                       disabled={
+                        isSaving ||
                         !passwordData.currentPassword || 
                         !passwordData.newPassword || 
                         !passwordData.confirmPassword
                       }
                     >
-                      <Lock className="mr-2 h-4 w-4" />
-                      Update Password
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-2 h-4 w-4" />
+                          Update Password
+                        </>
+                      )}
                     </Button>
                   </div>
                   
@@ -445,23 +725,26 @@ const Profile = () => {
                             {index === 0 && (
                               <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
                                 <Check className="mr-1 h-3 w-3" />
-                                Current
+                                Latest
                               </Badge>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">{activity.device}</p>
                           <p className="text-sm text-muted-foreground">{activity.location}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{activity.date}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(activity.date).toLocaleString()}
+                        </p>
                       </div>
                     ))}
+                    
+                    {accountActivity.length === 0 && (
+                      <div className="text-center py-4 text-muted-foreground">
+                        No activity recorded yet
+                      </div>
+                    )}
                   </div>
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" className="w-full">
-                    View All Activity
-                  </Button>
-                </CardFooter>
               </Card>
             </TabsContent>
           </Tabs>
