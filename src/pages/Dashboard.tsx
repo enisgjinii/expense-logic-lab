@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { formatCurrency } from '@/utils/finance-utils';
@@ -6,6 +7,7 @@ import CategoryChart from '@/components/CategoryChart';
 import MonthlyChart from '@/components/MonthlyChart';
 import RecentTransactions from '@/components/RecentTransactions';
 import AccountsOverview from '@/components/AccountsOverview';
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import {
   CreditCard,
   ArrowDownRight,
@@ -14,21 +16,60 @@ import {
   TrendingUp,
   Calendar,
   PieChart,
-  List
+  List,
+  Grip
 } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
+
+// Define the dashboard panel interface
+interface DashboardPanel {
+  id: string;
+  title: string;
+  component: string;
+  size: 'small' | 'medium' | 'large' | 'full';
+}
 
 const Dashboard = () => {
   const { stats, refreshData } = useFinance();
   const [timeRange, setTimeRange] = useState('month'); // month, quarter, year
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [highlightedCategory, setHighlightedCategory] = useState(null);
+  const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+  
+  // Dashboard layout state
+  const [panels, setPanels] = useState<DashboardPanel[]>(() => {
+    const savedLayout = localStorage.getItem('dashboardLayout');
+    if (savedLayout) {
+      try {
+        return JSON.parse(savedLayout);
+      } catch (e) {
+        console.error('Failed to parse saved dashboard layout');
+      }
+    }
+    
+    // Default layout
+    return [
+      { id: 'stats', title: 'Key Statistics', component: 'statistics', size: 'full' },
+      { id: 'monthly', title: 'Monthly Overview', component: 'monthlyChart', size: 'medium' },
+      { id: 'categories', title: 'Expense Categories', component: 'categoryChart', size: 'small' },
+      { id: 'accounts', title: 'Accounts', component: 'accounts', size: 'small' },
+      { id: 'transactions', title: 'Recent Transactions', component: 'transactions', size: 'medium' },
+    ];
+  });
+
+  // Save layout when it changes
+  useEffect(() => {
+    localStorage.setItem('dashboardLayout', JSON.stringify(panels));
+  }, [panels]);
 
   // Simulate data refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshData();
-    setTimeout(() => setIsRefreshing(false), 800);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      toast({ title: "Dashboard Refreshed", description: "Latest data has been loaded" });
+    }, 800);
   };
 
   // Auto-refresh effect
@@ -50,15 +91,27 @@ const Dashboard = () => {
     );
   }
 
+  // Handle drag and drop
+  const handleDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const items = Array.from(panels);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setPanels(items);
+    toast({ title: "Layout Updated", description: "Dashboard layout has been saved" });
+  };
+
   // Calculate trend values more dynamically
   const incomeChange = stats.byMonth.length > 1 
     ? ((stats.byMonth[stats.byMonth.length - 1].income - stats.byMonth[stats.byMonth.length - 2].income) / 
-       stats.byMonth[stats.byMonth.length - 2].income) * 100 
+       (stats.byMonth[stats.byMonth.length - 2].income || 1)) * 100 
     : 0;
   
   const expenseChange = stats.byMonth.length > 1 
     ? ((stats.byMonth[stats.byMonth.length - 1].expense - stats.byMonth[stats.byMonth.length - 2].expense) / 
-       stats.byMonth[stats.byMonth.length - 2].expense) * 100 
+       (stats.byMonth[stats.byMonth.length - 2].expense || 1)) * 100 
     : 0;
 
   // Filter data based on timeRange
@@ -76,25 +129,148 @@ const Dashboard = () => {
   // Get insights based on current data
   const getInsights = () => {
     // Find highest expense category
-    const highestExpenseCategory = [...stats.byCategory].sort((a, b) => b.amount - a.amount)[0];
+    const highestExpenseCategory = [...stats.byCategory].sort((a, b) => b.total - a.total)[0];
     
-    // Find fastest growing expense
+    // Calculate growth for each category
     const growingExpenses = stats.byMonth.length > 2 
       ? stats.byCategory.map(cat => {
-          const prevMonth = stats.byMonth[stats.byMonth.length - 2].categories?.find(c => c.name === cat.name)?.amount || 0;
-          const growth = prevMonth > 0 ? (cat.amount - prevMonth) / prevMonth * 100 : 0;
-          return { ...cat, growth };
+          // Find this category in the previous month data
+          const prevMonthCategories = stats.byMonth[stats.byMonth.length - 2].categories || [];
+          const prevCategory = prevMonthCategories.find(c => c.category === cat.category);
+          const prevAmount = prevCategory ? prevCategory.total : 0;
+          
+          const growth = prevAmount > 0 ? (cat.total - prevAmount) / prevAmount * 100 : 0;
+          return { 
+            ...cat, 
+            growth 
+          };
         }).sort((a, b) => b.growth - a.growth)[0]
       : null;
     
     return {
       highestExpense: highestExpenseCategory,
       growingExpense: growingExpenses,
-      savingsRate: ((stats.totalIncome - stats.totalExpense) / stats.totalIncome * 100).toFixed(1)
+      savingsRate: stats.totalIncome > 0 ? ((stats.totalIncome - stats.totalExpense) / stats.totalIncome * 100) : 0
     };
   };
 
   const insights = getInsights();
+
+  // Render dashboard components based on panel type
+  const renderPanelContent = (panel: DashboardPanel) => {
+    switch(panel.component) {
+      case 'statistics':
+        return (
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <StatisticsCard
+              title="Total Income"
+              value={formatCurrency(stats.totalIncome)}
+              icon={<ArrowUpRight className="h-5 w-5 text-emerald-500" />}
+              trend={{
+                value: incomeChange.toFixed(1),
+                label: 'since last month',
+                isPositive: incomeChange >= 0
+              }}
+              className="sm:col-span-1"
+            />
+            <StatisticsCard
+              title="Total Expenses"
+              value={formatCurrency(stats.totalExpense)}
+              icon={<ArrowDownRight className="h-5 w-5 text-rose-500" />}
+              trend={{
+                value: expenseChange.toFixed(1),
+                label: 'since last month',
+                isPositive: expenseChange <= 0
+              }}
+              className="sm:col-span-1"
+            />
+            <StatisticsCard
+              title="Current Balance"
+              value={formatCurrency(stats.balance)}
+              icon={<WalletCards className="h-5 w-5 text-blue-500" />}
+              trend={{
+                value: insights.savingsRate.toFixed(1),
+                label: 'savings rate',
+                isPositive: true
+              }}
+              className="sm:col-span-1"
+            />
+            <StatisticsCard
+              title="Highest Expense"
+              value={insights.highestExpense ? insights.highestExpense.category : 'N/A'}
+              description={insights.highestExpense ? formatCurrency(insights.highestExpense.total) : ''}
+              icon={<CreditCard className="h-5 w-5 text-purple-500" />}
+              className="sm:col-span-1"
+              onClick={() => insights.highestExpense && setHighlightedCategory(insights.highestExpense.category)}
+            />
+          </div>
+        );
+      case 'monthlyChart':
+        return (
+          <div className="bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Income vs Expenses</h2>
+              <span className="text-sm text-muted-foreground">{timeRange === 'month' ? '30 days' : timeRange === 'quarter' ? '3 months' : '12 months'}</span>
+            </div>
+            <MonthlyChart data={getFilteredData()} />
+          </div>
+        );
+      case 'categoryChart':
+        return (
+          <div className="bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Expense Breakdown</h2>
+              <button 
+                onClick={() => setHighlightedCategory(null)} 
+                className={`text-xs px-2 py-1 rounded-full ${highlightedCategory ? 'bg-muted' : 'hidden'}`}
+              >
+                Reset
+              </button>
+            </div>
+            <CategoryChart 
+              data={stats.byCategory}
+              selectedCategory={highlightedCategory}
+              onCategorySelect={(category) => setHighlightedCategory(category)}
+            />
+          </div>
+        );
+      case 'accounts':
+        return (
+          <div className="bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Accounts</h2>
+              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{stats.byAccount.length}</span>
+            </div>
+            <AccountsOverview accounts={stats.byAccount} />
+          </div>
+        );
+      case 'transactions':
+        return (
+          <div className="bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Recent Transactions</h2>
+              <button className="text-sm text-blue-500 hover:underline">
+                View all
+              </button>
+            </div>
+            <RecentTransactions transactions={stats.recentTransactions.slice(0, 5)} />
+          </div>
+        );
+      default:
+        return <div>Unknown panel type</div>;
+    }
+  };
+
+  // Render panel based on size
+  const getPanelClasses = (size: string) => {
+    switch(size) {
+      case 'small': return 'col-span-12 md:col-span-4';
+      case 'medium': return 'col-span-12 md:col-span-8';
+      case 'large': return 'col-span-12';
+      case 'full': return 'col-span-12';
+      default: return 'col-span-12 md:col-span-6';
+    }
+  };
 
   return (
     <div className="space-y-6 pb-10 animate-in">
@@ -177,55 +353,6 @@ const Dashboard = () => {
 
       {activeTab === 'overview' && (
         <>
-          {/* Stats Cards with Animated Counters */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-            <StatisticsCard
-              title="Total Income"
-              value={formatCurrency(stats.totalIncome)}
-              icon={<ArrowUpRight className="h-5 w-5 text-emerald-500" />}
-              trend={{
-                value: incomeChange.toFixed(1),
-                label: 'since last month',
-                isPositive: incomeChange >= 0
-              }}
-              className="sm:col-span-1"
-              animated={true}
-            />
-            <StatisticsCard
-              title="Total Expenses"
-              value={formatCurrency(stats.totalExpense)}
-              icon={<ArrowDownRight className="h-5 w-5 text-rose-500" />}
-              trend={{
-                value: expenseChange.toFixed(1),
-                label: 'since last month',
-                isPositive: expenseChange <= 0
-              }}
-              className="sm:col-span-1"
-              animated={true}
-            />
-            <StatisticsCard
-              title="Current Balance"
-              value={formatCurrency(stats.balance)}
-              icon={<WalletCards className="h-5 w-5 text-blue-500" />}
-              trend={{
-                value: insights.savingsRate,
-                label: 'savings rate',
-                isPositive: true
-              }}
-              className="sm:col-span-1"
-              animated={true}
-            />
-            <StatisticsCard
-              title="Highest Expense"
-              value={insights.highestExpense ? insights.highestExpense.name : 'N/A'}
-              subvalue={insights.highestExpense ? formatCurrency(insights.highestExpense.amount) : ''}
-              icon={<CreditCard className="h-5 w-5 text-purple-500" />}
-              className="sm:col-span-1"
-              onClick={() => setHighlightedCategory(insights.highestExpense?.name)}
-              interactive={true}
-            />
-          </div>
-          
           {/* Financial Insights Banner */}
           {insights.growingExpense && insights.growingExpense.growth > 10 && (
             <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6 animate-pulse">
@@ -238,74 +365,48 @@ const Dashboard = () => {
                 <div className="ml-3">
                   <h3 className="text-sm font-medium text-amber-800">Spending Alert</h3>
                   <div className="mt-1 text-sm text-amber-700">
-                    Your spending on <strong>{insights.growingExpense.name}</strong> has increased by {insights.growingExpense.growth.toFixed(1)}% compared to last month.
+                    Your spending on <strong>{insights.growingExpense.category}</strong> has increased by {insights.growingExpense.growth.toFixed(1)}% compared to last month.
                   </div>
                 </div>
               </div>
             </div>
           )}
           
-          {/* Charts Section */}
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
-            <div className="md:col-span-2 bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium">Income vs Expenses</h2>
-                <span className="text-sm text-muted-foreground">{timeRange === 'month' ? '30 days' : timeRange === 'quarter' ? '3 months' : '12 months'}</span>
-              </div>
-              <MonthlyChart 
-                data={getFilteredData()} 
-                animate={true} 
-                showTooltips={true}
-                onHover={(month) => console.log('Hovering month:', month)}
-              />
-            </div>
-            <div className="bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium">Expense Breakdown</h2>
-                <button 
-                  onClick={() => setHighlightedCategory(null)} 
-                  className={`text-xs px-2 py-1 rounded-full ${highlightedCategory ? 'bg-muted' : 'hidden'}`}
+          {/* Draggable Dashboard Panels */}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="dashboard-panels" direction="vertical">
+              {(provided) => (
+                <div 
+                  className="grid gap-6 grid-cols-12" 
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
                 >
-                  Reset
-                </button>
-              </div>
-              <CategoryChart 
-                data={stats.byCategory} 
-                highlightCategory={highlightedCategory}
-                onCategoryClick={(category) => setHighlightedCategory(category)}
-                animate={true}
-                interactive={true}
-              />
-            </div>
-          </div>
-          
-          {/* Accounts Overview */}
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-3">
-            <div className="md:col-span-1 bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium">Accounts</h2>
-                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">{stats.byAccount.length}</span>
-              </div>
-              <AccountsOverview 
-                accounts={stats.byAccount} 
-                showActions={true}
-                onAccountClick={(account) => console.log('Account clicked:', account)}
-              />
-            </div>
-            <div className="md:col-span-2 bg-card rounded-xl shadow-sm p-4 hover:shadow-md transition-all">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-medium">Recent Transactions</h2>
-                <button className="text-sm text-blue-500 hover:underline">
-                  View all
-                </button>
-              </div>
-              <RecentTransactions 
-                transactions={stats.recentTransactions.slice(0, 5)} 
-                interactive={true}
-                onTransactionClick={(transaction) => console.log('Transaction clicked:', transaction)}
-              />
-            </div>
-          </div>
+                  {panels.map((panel, index) => (
+                    <Draggable key={panel.id} draggableId={panel.id} index={index}>
+                      {(provided) => (
+                        <div
+                          className={`${getPanelClasses(panel.size)} group`}
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                        >
+                          <div className="h-full relative">
+                            <div 
+                              className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-muted/80 rounded-md p-1 cursor-move"
+                              {...provided.dragHandleProps}
+                            >
+                              <Grip className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            {renderPanelContent(panel)}
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         </>
       )}
 
@@ -324,13 +425,7 @@ const Dashboard = () => {
               </button>
             </div>
           </div>
-          <RecentTransactions 
-            transactions={stats.recentTransactions} 
-            showFilters={true}
-            pagination={true}
-            itemsPerPage={10}
-            interactive={true}
-          />
+          <RecentTransactions transactions={stats.recentTransactions} />
         </div>
       )}
 
@@ -342,14 +437,14 @@ const Dashboard = () => {
               {stats.byCategory.slice(0, 5).map((category, idx) => (
                 <div 
                   key={idx} 
-                  className={`flex justify-between items-center p-3 rounded-lg cursor-pointer hover:bg-muted ${highlightedCategory === category.name ? 'bg-blue-50 border border-blue-200' : ''}`}
-                  onClick={() => setHighlightedCategory(category.name === highlightedCategory ? null : category.name)}
+                  className={`flex justify-between items-center p-3 rounded-lg cursor-pointer hover:bg-muted ${highlightedCategory === category.category ? 'bg-blue-50 border border-blue-200' : ''}`}
+                  onClick={() => setHighlightedCategory(category.category === highlightedCategory ? null : category.category)}
                 >
                   <div className="flex items-center">
                     <div className={`w-3 h-3 rounded-full mr-3`} style={{backgroundColor: category.color || `hsl(${idx * 50}, 70%, 50%)`}} />
-                    <span>{category.name}</span>
+                    <span>{category.category}</span>
                   </div>
-                  <span className="font-medium">{formatCurrency(category.amount)}</span>
+                  <span className="font-medium">{formatCurrency(category.total)}</span>
                 </div>
               ))}
             </div>
@@ -358,13 +453,8 @@ const Dashboard = () => {
             <h2 className="text-lg font-medium mb-4">Category Breakdown</h2>
             <CategoryChart 
               data={stats.byCategory}
-              highlightCategory={highlightedCategory}
-              onCategoryClick={(category) => setHighlightedCategory(category)}
-              showLegend={true}
-              showPercentages={true}
-              animate={true}
-              interactive={true}
-              layout="full"
+              selectedCategory={highlightedCategory}
+              onCategorySelect={(category) => setHighlightedCategory(category)}
             />
           </div>
         </div>

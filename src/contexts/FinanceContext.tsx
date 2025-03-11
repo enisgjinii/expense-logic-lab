@@ -51,7 +51,7 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => Promise<void>;
   clearData: () => void;
   addBudget: (budget: Budget) => void;
-  deleteBudget: (id: string) => void;
+  deleteBudget: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
   exportData: () => string;
   signIn: (email: string, password: string) => Promise<void>;
@@ -269,8 +269,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
     reader.onerror = (error) => {
-      console.error('Error reading file:', error);
-      toast({ title: "File Read Error", description: "Failed to read the XLS file: " + (error as Error).message, variant: "destructive" });
+      // Fix the TypeError by casting the error to unknown first
+      const err = error as unknown as Error;
+      console.error('Error reading file:', err);
+      toast({ title: "File Read Error", description: "Failed to read the XLS file: " + err.message, variant: "destructive" });
       setIsLoading(false);
     };
     reader.readAsArrayBuffer(file);
@@ -448,6 +450,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Adding updateBudget as an alias for addBudget to fix TypeScript errors
+  const updateBudget = addBudget;
+
   const deleteBudget = async (id: string) => {
     try {
       if (user) {
@@ -515,6 +520,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteTransaction,
       clearData,
       addBudget,
+      updateBudget, // Add this to fix TypeScript errors
       deleteBudget,
       refreshData,
       exportData,

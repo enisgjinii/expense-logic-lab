@@ -1,284 +1,539 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/utils/finance-utils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DateRange } from 'react-day-picker';
-import { addMonths, format, subMonths } from 'date-fns';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { CalendarIcon, Download, BarChart3, PieChart, LineChart, TrendingUp, HelpCircle } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatCurrency } from '@/utils/finance-utils';
-
-// Placeholder components for the actual reports
-const IncomeExpenseTrendChart = () => (
-  <div className="h-80 flex items-center justify-center border border-dashed rounded-lg">
-    <div className="text-center space-y-2">
-      <TrendingUp className="h-10 w-10 mx-auto text-muted-foreground" />
-      <p className="text-muted-foreground">Income vs Expense Trend Chart</p>
-    </div>
-  </div>
-);
-
-const CategoryBreakdownChart = () => (
-  <div className="h-80 flex items-center justify-center border border-dashed rounded-lg">
-    <div className="text-center space-y-2">
-      <PieChart className="h-10 w-10 mx-auto text-muted-foreground" />
-      <p className="text-muted-foreground">Category Breakdown Chart</p>
-    </div>
-  </div>
-);
-
-const MonthlyTrendChart = () => (
-  <div className="h-80 flex items-center justify-center border border-dashed rounded-lg">
-    <div className="text-center space-y-2">
-      <LineChart className="h-10 w-10 mx-auto text-muted-foreground" />
-      <p className="text-muted-foreground">Monthly Trend Chart</p>
-    </div>
-  </div>
-);
+import { PieChart, LineChart, BarChart, ComposedChart, Area, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Pie, Line } from 'recharts';
+import { toast } from '@/components/ui/use-toast';
+import { downloadCSV } from '@/utils/export-utils';
+import { CalendarIcon, Download, PieChart as PieChartIcon, BarChart as BarChartIcon, LineChart as LineChartIcon, FileType } from 'lucide-react';
 
 const Reports = () => {
-  const { stats } = useFinance();
-  const [reportType, setReportType] = useState("expense-income");
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: subMonths(new Date(), 3),
-    to: new Date(),
-  });
-  const [groupBy, setGroupBy] = useState("month");
+  const { transactions, stats, budgets, refreshData } = useFinance();
+  const [reportType, setReportType] = useState('expenses');
+  const [timeRange, setTimeRange] = useState('month');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [chartType, setChartType] = useState('bar');
+  const [isLoading, setIsLoading] = useState(false);
+  const [reportData, setReportData] = useState<any[]>([]);
 
-  // Generate summary data based on current filters
-  const summaryData = {
-    totalIncome: 12345.67,
-    totalExpense: 8765.43,
-    netSavings: 3580.24,
-    savingsRate: 29,
-    averageMonthlyExpense: 2921.81,
-    topCategory: "Housing",
-    topCategoryAmount: 2500,
-    mostExpensiveMonth: "October",
-    mostExpensiveMonthAmount: 3200,
+  const categories = [...new Set(transactions.map(t => t.category))];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  // Color palette for charts
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
+
+  useEffect(() => {
+    generateReport();
+  }, [reportType, timeRange, categoryFilter, transactions]);
+
+  const generateReport = async () => {
+    setIsLoading(true);
+    
+    try {
+      // Get current date
+      const now = new Date();
+      let startDate = new Date();
+      
+      // Set time range
+      if (timeRange === 'month') {
+        startDate.setMonth(now.getMonth() - 1);
+      } else if (timeRange === 'quarter') {
+        startDate.setMonth(now.getMonth() - 3);
+      } else if (timeRange === 'year') {
+        startDate.setFullYear(now.getFullYear() - 1);
+      } else if (timeRange === 'all') {
+        startDate = new Date(0); // Beginning of time
+      }
+      
+      // Filter transactions by date and category
+      let filteredTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        const meetsDateCriteria = transactionDate >= startDate && transactionDate <= now;
+        const meetsCategoryCriteria = categoryFilter === 'all' || t.category === categoryFilter;
+        const meetsTypeCriteria = reportType === 'all' || 
+                                 (reportType === 'expenses' && t.type === 'Expense') ||
+                                 (reportType === 'income' && t.type === 'Income');
+        
+        return meetsDateCriteria && meetsCategoryCriteria && meetsTypeCriteria;
+      });
+      
+      let data: any[] = [];
+      
+      // Format data based on report type
+      if (chartType === 'pie') {
+        // Group by category for pie chart
+        const categoryMap = new Map();
+        
+        filteredTransactions.forEach(t => {
+          const amount = t.type === 'Expense' ? -t.amount : t.amount;
+          if (categoryMap.has(t.category)) {
+            categoryMap.set(t.category, categoryMap.get(t.category) + amount);
+          } else {
+            categoryMap.set(t.category, amount);
+          }
+        });
+        
+        categoryMap.forEach((amount, category) => {
+          data.push({
+            name: category,
+            value: Math.abs(amount), // Always positive for pie chart
+            originalValue: amount // Keep original sign for tooltips
+          });
+        });
+        
+        // Sort by value
+        data.sort((a, b) => b.value - a.value);
+        
+      } else {
+        // Group by month for line/bar charts
+        const monthlyData = new Map();
+        
+        // Initialize with all months
+        if (timeRange === 'year' || timeRange === 'all') {
+          months.forEach(month => {
+            monthlyData.set(month, { 
+              name: month, 
+              income: 0, 
+              expense: 0, 
+              net: 0 
+            });
+          });
+        }
+        
+        filteredTransactions.forEach(t => {
+          const transactionDate = new Date(t.date);
+          const month = months[transactionDate.getMonth()];
+          const amount = t.amount;
+          
+          if (!monthlyData.has(month)) {
+            monthlyData.set(month, { 
+              name: month, 
+              income: 0, 
+              expense: 0, 
+              net: 0 
+            });
+          }
+          
+          const monthData = monthlyData.get(month);
+          
+          if (t.type === 'Income') {
+            monthData.income += amount;
+          } else {
+            monthData.expense += amount;
+          }
+          
+          monthData.net = monthData.income - monthData.expense;
+          monthlyData.set(month, monthData);
+        });
+        
+        // Convert map to array and sort by month sequence
+        data = Array.from(monthlyData.values());
+        const currentMonthIndex = now.getMonth();
+        
+        data.sort((a, b) => {
+          const aIndex = months.indexOf(a.name);
+          const bIndex = months.indexOf(b.name);
+          
+          // Handle year wrap-around
+          const adjustedAIndex = aIndex <= currentMonthIndex ? aIndex + 12 : aIndex;
+          const adjustedBIndex = bIndex <= currentMonthIndex ? bIndex + 12 : bIndex;
+          
+          return adjustedAIndex - adjustedBIndex;
+        });
+        
+        // Take only the last N months based on time range
+        if (timeRange === 'month') {
+          data = data.slice(-2);
+        } else if (timeRange === 'quarter') {
+          data = data.slice(-4);
+        }
+      }
+      
+      setReportData(data);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast({
+        title: "Report Generation Failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleExport = () => {
+    try {
+      const filename = `finance-report-${reportType}-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+      
+      let csvData: any[] = [];
+      
+      if (chartType === 'pie') {
+        csvData = reportData.map(item => ({
+          Category: item.name,
+          Amount: formatCurrency(item.originalValue)
+        }));
+      } else {
+        csvData = reportData.map(item => ({
+          Month: item.name,
+          Income: formatCurrency(item.income),
+          Expense: formatCurrency(item.expense),
+          Net: formatCurrency(item.net)
+        }));
+      }
+      
+      downloadCSV(csvData, filename);
+      
+      toast({
+        title: "Report Exported",
+        description: `Your report has been exported as ${filename}`,
+      });
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting your report. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const renderActiveChart = () => {
+    if (reportData.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available for the selected filters</p>
+        </div>
+      );
+    }
+    
+    if (chartType === 'pie') {
+      return (
+        <ResponsiveContainer width="100%" height={400}>
+          <PieChart>
+            <Pie
+              data={reportData}
+              cx="50%"
+              cy="50%"
+              labelLine={true}
+              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+              outerRadius={150}
+              fill="#8884d8"
+              dataKey="value"
+            >
+              {reportData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip 
+              formatter={(value: number) => formatCurrency(value)}
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  return (
+                    <div className="bg-background/95 backdrop-blur-sm border rounded-lg shadow-lg p-3">
+                      <p className="font-medium">{payload[0].name}</p>
+                      <p className="text-lg font-semibold">{formatCurrency(payload[0].value)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(payload[0].payload.value / reportData.reduce((sum, item) => sum + item.value, 0) * 100).toFixed(1)}% of total
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      );
+    } else if (chartType === 'line') {
+      return (
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={reportData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis tickFormatter={(value) => formatCurrency(value).split('.')[0]} />
+            <Tooltip formatter={(value) => formatCurrency(value)} />
+            <Legend />
+            <Line type="monotone" dataKey="income" stroke="#4ade80" strokeWidth={2} activeDot={{ r: 8 }} name="Income" />
+            <Line type="monotone" dataKey="expense" stroke="#f43f5e" strokeWidth={2} activeDot={{ r: 8 }} name="Expense" />
+            <Line type="monotone" dataKey="net" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} name="Net" />
+          </LineChart>
+        </ResponsiveContainer>
+      );
+    } else {
+      return (
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={reportData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis tickFormatter={(value) => formatCurrency(value).split('.')[0]} />
+            <Tooltip formatter={(value) => formatCurrency(value)} />
+            <Legend />
+            <Bar dataKey="income" name="Income" fill="#4ade80" />
+            <Bar dataKey="expense" name="Expense" fill="#f43f5e" />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
   };
 
   return (
     <div className="space-y-6 pb-10 animate-in">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Financial Reports</h1>
-          <p className="text-muted-foreground">Analyze your financial data with customizable reports</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-2xl font-bold mb-2 sm:mb-0">Financial Reports</h1>
+        
+        <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+          <Button variant="outline" onClick={handleExport} size="sm">
+            <Download className="h-4 w-4 mr-1" /> Export
+          </Button>
+          
+          <Button onClick={() => {
+            refreshData();
+            toast({ title: "Report Refreshed", description: "Data has been updated" });
+          }} size="sm">
+            Refresh Data
+          </Button>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" />
-          Export Report
-        </Button>
       </div>
-
-      {/* Report Configuration */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Report Settings</CardTitle>
-          <CardDescription>Customize your report view</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Report Type</label>
+      
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Report Type</CardTitle>
+          </CardHeader>
+          <CardContent>
             <Select value={reportType} onValueChange={setReportType}>
               <SelectTrigger>
                 <SelectValue placeholder="Select report type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="expense-income">Expense vs. Income</SelectItem>
-                <SelectItem value="category-breakdown">Category Breakdown</SelectItem>
-                <SelectItem value="monthly-trend">Monthly Trend</SelectItem>
-                <SelectItem value="savings-rate">Savings Rate</SelectItem>
+                <SelectItem value="all">All Transactions</SelectItem>
+                <SelectItem value="expenses">Expenses Only</SelectItem>
+                <SelectItem value="income">Income Only</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Date Range</label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dateRange && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "LLL dd, y")} -{" "}
-                        {format(dateRange.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(dateRange.from, "LLL dd, y")
-                    )
-                  ) : (
-                    <span>Pick a date range</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Group By</label>
-            <Select value={groupBy} onValueChange={setGroupBy}>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Time Range</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger>
-                <SelectValue placeholder="Select grouping" />
+                <SelectValue placeholder="Select time range" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="day">Day</SelectItem>
-                <SelectItem value="week">Week</SelectItem>
-                <SelectItem value="month">Month</SelectItem>
-                <SelectItem value="quarter">Quarter</SelectItem>
+                <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="quarter">Last Quarter</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Financial Summary */}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category, index) => (
+                  <SelectItem key={index} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Visualization</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex space-x-2">
+              <Button 
+                variant={chartType === 'bar' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setChartType('bar')}
+                className="flex-1"
+              >
+                <BarChartIcon className="h-4 w-4 mr-1" /> Bar
+              </Button>
+              <Button 
+                variant={chartType === 'line' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setChartType('line')}
+                className="flex-1"
+              >
+                <LineChartIcon className="h-4 w-4 mr-1" /> Line
+              </Button>
+              <Button 
+                variant={chartType === 'pie' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setChartType('pie')}
+                className="flex-1"
+              >
+                <PieChartIcon className="h-4 w-4 mr-1" /> Pie
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
       <Card>
         <CardHeader>
-          <CardTitle>Financial Summary</CardTitle>
+          <CardTitle className="text-xl">
+            {reportType === 'all' ? 'All Transactions' : 
+              reportType === 'expenses' ? 'Expense Report' : 'Income Report'} - {
+                timeRange === 'month' ? 'Last Month' : 
+                timeRange === 'quarter' ? 'Last Quarter' : 
+                timeRange === 'year' ? 'Last Year' : 'All Time'
+              }
+          </CardTitle>
           <CardDescription>
-            {dateRange?.from && dateRange.to
-              ? `${format(dateRange.from, "MMM d, yyyy")} to ${format(
-                  dateRange.to,
-                  "MMM d, yyyy"
-                )}`
-              : "Summary for the selected period"}
+            {categoryFilter !== 'all' ? `Filtered by category: ${categoryFilter}` : 'All categories'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Income</p>
-              <p className="text-2xl font-bold text-income">
-                {formatCurrency(summaryData.totalIncome)}
-              </p>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Expenses</p>
-              <p className="text-2xl font-bold text-expense">
-                {formatCurrency(summaryData.totalExpense)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Net Savings</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(summaryData.netSavings)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Savings Rate</p>
-              <p className="text-2xl font-bold">{summaryData.savingsRate}%</p>
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Avg. Monthly Expense</p>
-              <p className="text-lg font-semibold">
-                {formatCurrency(summaryData.averageMonthlyExpense)}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Top Category</p>
-              <p className="text-lg font-semibold">
-                {summaryData.topCategory} ({formatCurrency(summaryData.topCategoryAmount)})
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Highest Expense Month</p>
-              <p className="text-lg font-semibold">
-                {summaryData.mostExpensiveMonth} ({formatCurrency(summaryData.mostExpensiveMonthAmount)})
-              </p>
-            </div>
-          </div>
+          ) : renderActiveChart()}
         </CardContent>
       </Card>
-
-      {/* Report Visualizations */}
-      <Tabs defaultValue="chart" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="chart" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Chart View
-          </TabsTrigger>
-          <TabsTrigger value="table" className="flex items-center gap-2">
-            <HelpCircle className="h-4 w-4" />
-            Table View
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="chart" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {reportType === "expense-income"
-                  ? "Income vs Expenses Trend"
-                  : reportType === "category-breakdown"
-                  ? "Expense Categories Breakdown"
-                  : reportType === "monthly-trend"
-                  ? "Monthly Financial Trend"
-                  : "Savings Rate Trends"}
-              </CardTitle>
-              <CardDescription>
-                {reportType === "expense-income"
-                  ? "Visualize your income and expenses over time"
-                  : reportType === "category-breakdown"
-                  ? "See where your money is being spent"
-                  : reportType === "monthly-trend"
-                  ? "Track your monthly financial patterns"
-                  : "Monitor your savings rate progress"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {reportType === "expense-income" && <IncomeExpenseTrendChart />}
-              {reportType === "category-breakdown" && <CategoryBreakdownChart />}
-              {reportType === "monthly-trend" && <MonthlyTrendChart />}
-              {reportType === "savings-rate" && <MonthlyTrendChart />}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="table" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detailed Data</CardTitle>
-              <CardDescription>
-                Tabular view of your financial data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                <p>Table view will be available in a future update</p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2">
+              <div className="flex justify-between">
+                <dt>Total Transactions:</dt>
+                <dd className="font-semibold">{reportData.length}</dd>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              
+              {chartType !== 'pie' && (
+                <>
+                  <div className="flex justify-between">
+                    <dt>Total Income:</dt>
+                    <dd className="font-semibold text-income">
+                      {formatCurrency(reportData.reduce((sum, item) => sum + (item.income || 0), 0))}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt>Total Expenses:</dt>
+                    <dd className="font-semibold text-expense">
+                      {formatCurrency(reportData.reduce((sum, item) => sum + (item.expense || 0), 0))}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between border-t pt-2 mt-2">
+                    <dt>Net:</dt>
+                    <dd className={`font-bold ${reportData.reduce((sum, item) => sum + ((item.income || 0) - (item.expense || 0)), 0) >= 0 ? 'text-income' : 'text-expense'}`}>
+                      {formatCurrency(reportData.reduce((sum, item) => sum + ((item.income || 0) - (item.expense || 0)), 0))}
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">
+              {reportType === 'expenses' ? 'Top Expenses' : 'Top Income Sources'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {chartType === 'pie' && reportData.slice(0, 5).map((item, index) => (
+                <li key={index} className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <div 
+                      className="w-3 h-3 rounded-full mr-2" 
+                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    />
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="font-medium">{formatCurrency(item.value)}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+        
+        <Card className="md:col-span-2 lg:col-span-1">
+          <CardHeader>
+            <CardTitle className="text-lg">Report Insights</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {chartType !== 'pie' && reportData.length > 1 && (
+                <div>
+                  <h4 className="font-medium mb-1">Trends</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {(() => {
+                      const firstValue = reportData[0].expense || 0;
+                      const lastValue = reportData[reportData.length - 1].expense || 0;
+                      
+                      if (firstValue === 0) return "No previous data to compare";
+                      
+                      const percentChange = ((lastValue - firstValue) / firstValue * 100).toFixed(1);
+                      const direction = lastValue > firstValue ? 'increased' : 'decreased';
+                      
+                      return `Your expenses have ${direction} by ${Math.abs(Number(percentChange))}% compared to the beginning of the period.`;
+                    })()}
+                  </p>
+                </div>
+              )}
+              
+              {reportType === 'expenses' && chartType === 'pie' && reportData.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">Spending Distribution</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Your largest spending category is <span className="font-medium">{reportData[0]?.name || 'N/A'}</span>, 
+                    representing {reportData[0] ? ((reportData[0].value / reportData.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1) : 0}% of your total expenses.
+                  </p>
+                </div>
+              )}
+              
+              <div>
+                <h4 className="font-medium mb-1">Recommendations</h4>
+                <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                  {reportType === 'expenses' && (
+                    <>
+                      <li>Consider setting a budget for your top spending categories</li>
+                      <li>Look for recurring expenses that could be reduced</li>
+                    </>
+                  )}
+                  {reportType === 'income' && (
+                    <>
+                      <li>Diversify your income sources for financial security</li>
+                      <li>Consider saving or investing a portion of your income</li>
+                    </>
+                  )}
+                  <li>Review your transactions regularly to stay on top of your finances</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
