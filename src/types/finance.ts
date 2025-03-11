@@ -1,3 +1,4 @@
+
 // Transaction type definitions
 export interface Transaction {
   id: string;
@@ -8,8 +9,10 @@ export interface Transaction {
   description: string;
   category: string;
   account: string;
+  payment_type?: 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'CASH';
   payee?: string;
   notes?: string;
+  note?: string; // Adding for backward compatibility
   recurring?: boolean;
   interval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   tags?: string[];
@@ -22,6 +25,7 @@ export interface Transaction {
 export interface Budget {
   id: string;
   category: string;
+  name?: string; // Adding name property for budget
   amount: number;
   period: 'weekly' | 'monthly' | 'yearly';
   createdAt?: any;
@@ -49,6 +53,7 @@ export interface AccountSummary {
   balance: number;
   percentage: number;
   color: string;
+  total?: number; // Adding for compatibility with AccountsOverview
 }
 
 export interface MonthlyData {

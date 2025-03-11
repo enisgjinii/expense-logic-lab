@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
@@ -239,7 +240,7 @@ const XLSImporter: React.FC = () => {
                               {transaction.type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs">{transaction.payment_type.replace('_', ' ')}</TableCell>
+                          <TableCell className="text-xs">{(transaction.payment_type || 'TRANSFER').replace('_', ' ')}</TableCell>
                           <TableCell className="text-sm">{new Date(transaction.date).toLocaleDateString()}</TableCell>
                         </TableRow>
                       ))}

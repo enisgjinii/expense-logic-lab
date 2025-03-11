@@ -51,6 +51,7 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => Promise<void>;
   clearData: () => void;
   addBudget: (budget: Budget) => void;
+  updateBudget: (budget: Budget) => void;
   deleteBudget: (id: string) => Promise<void>;
   refreshData: () => Promise<void>;
   exportData: () => string;
@@ -83,10 +84,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   
-  // Theme mode state: "light", "dark", or "system"
   const [themeMode, setThemeMode] = useState<"light" | "dark" | "system">("system");
 
-  // Load saved theme from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem("themeMode") as "light" | "dark" | "system" | null;
     if (savedTheme) {
@@ -94,7 +93,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
-  // Apply theme by adding CSS class to document root
   useEffect(() => {
     const getPreferredTheme = (mode: "light" | "dark" | "system") => {
       if (mode === "system") {
@@ -109,7 +107,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem("themeMode", themeMode);
   }, [themeMode]);
 
-  // Listen for system theme changes if in "system" mode
   useEffect(() => {
     if (themeMode === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -269,7 +266,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     };
     reader.onerror = (error) => {
-      // Fix the TypeError by casting the error to unknown first
       const err = error as unknown as Error;
       console.error('Error reading file:', err);
       toast({ title: "File Read Error", description: "Failed to read the XLS file: " + err.message, variant: "destructive" });
@@ -450,7 +446,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Adding updateBudget as an alias for addBudget to fix TypeScript errors
   const updateBudget = addBudget;
 
   const deleteBudget = async (id: string) => {
@@ -520,7 +515,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       deleteTransaction,
       clearData,
       addBudget,
-      updateBudget, // Add this to fix TypeScript errors
+      updateBudget,
       deleteBudget,
       refreshData,
       exportData,

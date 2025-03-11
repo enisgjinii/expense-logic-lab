@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,7 +51,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
       const matchesSearch =
         transaction.account.toLowerCase().includes(searchTerm.toLowerCase()) ||
         transaction.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.note.toLowerCase().includes(searchTerm.toLowerCase());
+        (transaction.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter ? transaction.type === typeFilter : true;
       const matchesPayment = paymentFilter ? transaction.payment_type === paymentFilter : true;
       let matchesDate = true;
@@ -117,8 +118,8 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
         tx.category,
         (tx.type === 'Income' ? '+' : '-') + tx.amount,
         tx.type,
-        tx.payment_type.replace('_', ' '),
-        tx.note || ''
+        (tx.payment_type || 'TRANSFER').replace('_', ' '),
+        tx.notes || ''
       ];
       csvRows.push(row.join(','));
     });
@@ -287,12 +288,12 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant="outline" className="flex items-center justify-center gap-1 w-fit ml-auto">
-                          <PaymentTypeIcon type={transaction.payment_type} />
-                          <span className="hidden sm:inline">{transaction.payment_type.replace('_', ' ')}</span>
+                          <PaymentTypeIcon type={transaction.payment_type || 'TRANSFER'} />
+                          <span className="hidden sm:inline">{(transaction.payment_type || 'TRANSFER').replace('_', ' ')}</span>
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                        {transaction.note || '-'}
+                        {transaction.notes || '-'}
                       </TableCell>
                     </TableRow>
                   ))

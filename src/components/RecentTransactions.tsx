@@ -44,7 +44,7 @@ const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions })
                 >
                   <div className="flex items-center space-x-3">
                     <div className="rounded-full p-2 bg-background">
-                      <TransactionIcon paymentType={transaction.payment_type} type={transaction.type} />
+                      <TransactionIcon paymentType={transaction.payment_type || 'TRANSFER'} type={transaction.type} />
                     </div>
                     <div>
                       <div className="font-medium group-hover:text-primary transition-colors">
@@ -62,7 +62,7 @@ const RecentTransactions: React.FC<RecentTransactionsProps> = ({ transactions })
                       {transaction.type === 'Income' ? '+' : '-'} {formatCurrency(transaction.amount)}
                     </div>
                     <Badge variant="outline" className="text-xs font-normal bg-background/50">
-                      {transaction.payment_type.replace('_', ' ')}
+                      {(transaction.payment_type || 'TRANSFER').replace('_', ' ')}
                     </Badge>
                   </div>
                 </div>
