@@ -21,7 +21,8 @@ import {
   deleteDoc,
   updateDoc,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  Timestamp
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -45,7 +46,8 @@ interface FinanceContextType {
   user: FirebaseUser | null;
   isLoading: boolean;
   isAuthLoading: boolean;
-  importXLS: (file: File) => void;
+  // Updated importXLS signature
+  importXLS: (file: File, transactions: Transaction[]) => Promise<void>;
   addTransaction: (transaction: Transaction) => Promise<void>;
   updateTransaction: (transaction: Transaction) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -83,7 +85,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
-  
+
   const [themeMode, setThemeMode] = useState<"light" | "dark" | "system">("system");
 
   useEffect(() => {
@@ -238,42 +240,48 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBudgetSummaries(newBudgetSummaries);
   }, [transactions, budgets]);
 
-  const importXLS = (file: File) => {
+  // -------------------------------------------------------------------------------------------
+  // UPDATED importXLS FUNCTION – Accepts the file and a prepared list of transactions
+  // -------------------------------------------------------------------------------------------
+  const importXLS = async (file: File, transactions: Transaction[]) => {
     setIsLoading(true);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const data = e.target?.result;
-        if (!data || typeof data === 'string') throw new Error('Invalid file data.');
-        const newTransactions = parseXLS(data);
-        if (newTransactions.length === 0) {
-          toast({ title: "Import Failed", description: "No valid transactions found in the XLS file", variant: "destructive" });
-          setIsLoading(false);
-          return;
-        }
-        if (user) {
-          await saveTransactionsToFirebase(newTransactions);
-          await fetchTransactionsFromFirebase();
-        } else {
-          setTransactions(prev => [...prev, ...newTransactions]);
-        }
-        toast({ title: "Import Successful", description: `Imported ${newTransactions.length} transactions from XLS` });
-      } catch (error: any) {
-        console.error('Error importing XLS:', error);
-        toast({ title: "Import Failed", description: error.message || "Failed to parse XLS file", variant: "destructive" });
-      } finally {
+    try {
+      if (transactions.length === 0) {
+        toast({
+          title: "Import Failed",
+          description: "No valid transactions found in the XLS file",
+          variant: "destructive"
+        });
         setIsLoading(false);
+        return;
       }
-    };
-    reader.onerror = (error) => {
-      const err = error as unknown as Error;
-      console.error('Error reading file:', err);
-      toast({ title: "File Read Error", description: "Failed to read the XLS file: " + err.message, variant: "destructive" });
+
+      // For testing, let's import only 4 transactions
+      const newTransactions = transactions.slice(0, 4);
+
+      if (user) {
+        await saveTransactionsToFirebase(newTransactions);
+        await fetchTransactionsFromFirebase();
+      } else {
+        setTransactions(prev => [...prev, ...newTransactions]);
+      }
+      toast({
+        title: "Import Successful",
+        description: `Imported ${newTransactions.length} transactions from XLS`
+      });
+    } catch (error: any) {
+      console.error('Error importing XLS:', error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to parse XLS file",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-    };
-    reader.readAsArrayBuffer(file);
+    }
   };
 
+  // Helper function to save new transactions to Firebase
   const saveTransactionsToFirebase = async (newTransactions: Transaction[]) => {
     if (!user) return;
     try {
