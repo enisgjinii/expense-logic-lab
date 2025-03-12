@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { useAppSettings } from '@/contexts/AppSettingsContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,6 @@ import SubscriptionPlans from '@/components/SubscriptionPlans';
 
 const Settings = () => {
   const { themeMode, setThemeMode, user, clearData, refreshData, exportData } = useFinance();
-  const { settings, updateSettings } = useAppSettings();
   const [activeTab, setActiveTab] = useState('appearance');
   
   // Firebase config state
@@ -68,7 +67,7 @@ const Settings = () => {
   });
 
   // Load settings from localStorage on mount
-  React.useEffect(() => {
+  useEffect(() => {
     const savedNotifications = localStorage.getItem('financeTrackerNotifications');
     const savedAppearance = localStorage.getItem('financeTrackerAppearance');
     const savedImportSettings = localStorage.getItem('financeTrackerImportSettings');
@@ -134,12 +133,12 @@ const Settings = () => {
   const handleUpdateSettings = (type: string) => {
     switch (type) {
       case 'Appearance':
-        updateSettings({
-          compactMode: appearance.compactMode,
-          animationsEnabled: appearance.animationsEnabled,
-          highContrastMode: appearance.highContrastMode,
-          fontSize: appearance.fontsize as 'small' | 'medium' | 'large',
-        });
+        localStorage.setItem('financeTrackerAppearance', JSON.stringify(appearance));
+        // Apply appearance settings
+        document.documentElement.classList.toggle('compact-mode', appearance.compactMode);
+        document.documentElement.classList.toggle('high-contrast', appearance.highContrastMode);
+        document.documentElement.style.setProperty('--animations-enabled', appearance.animationsEnabled ? '1' : '0');
+        document.documentElement.setAttribute('data-font-size', appearance.fontsize);
         break;
       case 'Notification':
         localStorage.setItem('financeTrackerNotifications', JSON.stringify(notifications));
