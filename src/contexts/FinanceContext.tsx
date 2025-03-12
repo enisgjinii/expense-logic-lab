@@ -8,6 +8,7 @@ import { useTransactionManager } from './useTransactionManager';
 import { useBudgetManager } from './useBudgetManager';
 import { useThemeManager } from './useThemeManager';
 import { toast } from '@/components/ui/use-toast';
+import { getCurrentSubscription } from '@/services/stripeService';
 
 const initialContextValue: FinanceContextType = {} as FinanceContextType;
 const FinanceContext = createContext<FinanceContextType>(initialContextValue);
@@ -43,6 +44,44 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   // Theme management
   const { themeMode, setThemeMode } = useThemeManager();
+
+  // Subscription management
+  const [subscription, setSubscription] = React.useState<any>(null);
+  
+  React.useEffect(() => {
+    // Check subscription status on context initialization
+    setSubscription(getCurrentSubscription());
+  }, []);
+
+  // Feature access based on subscription
+  const hasFeatureAccess = (featureName: string): boolean => {
+    const currentSub = getCurrentSubscription();
+    
+    // If no active subscription, only allow basic features
+    if (!currentSub?.status === 'active') {
+      // Allow basic features for everyone
+      const basicFeatures = ['basic_reports', 'transactions_basic'];
+      return basicFeatures.includes(featureName);
+    }
+    
+    // Feature access based on subscription level
+    if (currentSub.name === 'Basic') {
+      return ['basic_reports', 'transactions_basic', 'email_support'].includes(featureName);
+    }
+    
+    if (currentSub.name === 'Premium') {
+      return ['basic_reports', 'transactions_basic', 'email_support', 
+              'advanced_reports', 'unlimited_transactions', 'data_export', 
+              'priority_support'].includes(featureName);
+    }
+    
+    if (currentSub.name === 'Business') {
+      // Business has access to all features
+      return true;
+    }
+    
+    return false;
+  };
 
   // Clear all data
   const clearData = async () => {
@@ -134,7 +173,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       signUp,
       logout,
       themeMode,
-      setThemeMode
+      setThemeMode,
+      subscription: getCurrentSubscription(),
+      hasFeatureAccess
     }}>
       {children}
     </FinanceContext.Provider>

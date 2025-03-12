@@ -25,4 +25,11 @@ export interface FinanceContextType {
   logout: () => Promise<void>;
   themeMode: "light" | "dark" | "system";
   setThemeMode: (mode: "light" | "dark" | "system") => void;
+  subscription: {
+    id: string;
+    name: string;
+    status: 'active' | 'canceled' | 'past_due' | null;
+    renewalDate: Date | null;
+  } | null;
+  hasFeatureAccess: (featureName: string) => boolean;
 }
