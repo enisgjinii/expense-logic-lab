@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,11 +16,10 @@ import NotFound from "./pages/NotFound";
 import Categories from "./pages/Categories";
 import { FinanceProvider } from "./contexts/FinanceContext";
 import { useFinance } from "./contexts/FinanceContext";
+import { AppSettingsProvider } from "./contexts/AppSettingsContext";
 
-// Initialize query client for React Query
 const queryClient = new QueryClient();
 
-// Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isAuthLoading } = useFinance();
   
@@ -116,13 +114,15 @@ const AppRoutes = () => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <FinanceProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </FinanceProvider>
+      <AppSettingsProvider>
+        <FinanceProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </FinanceProvider>
+      </AppSettingsProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

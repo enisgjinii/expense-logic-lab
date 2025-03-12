@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -256,3 +255,66 @@
     rgba(255, 255, 255, 0)
   );
 }
+
+/* Compact Mode */
+.compact-mode {
+  --spacing-unit: 0.75rem;
+  --content-padding: 0.75rem;
+}
+
+.compact-mode .card,
+.compact-mode .input,
+.compact-mode .button {
+  padding: var(--spacing-unit);
+}
+
+/* High Contrast Mode */
+.high-contrast {
+  --primary: 222 89% 65%;
+  --secondary: 215 25% 27%;
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 100%;
+}
+
+.dark .high-contrast {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --muted: 0 0% 85%;
+  --muted-foreground: 0 0% 0%;
+}
+
+/* Font Sizes */
+[data-font-size="small"] {
+  font-size: 0.875rem;
+}
+
+[data-font-size="medium"] {
+  font-size: 1rem;
+}
+
+[data-font-size="large"] {
+  font-size: 1.125rem;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root[style*="--enable-animations: 1"] .animate-slide {
+  animation: slideIn 0.3s ease-out;
+}
+
+:root[style*="--enable-animations: 0"] .animate-slide {
+  animation: none;
+}
+
