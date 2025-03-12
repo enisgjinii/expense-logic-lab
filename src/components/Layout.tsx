@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,8 @@ import {
   Moon,
   Sun,
   Laptop,
-  HelpCircle
+  HelpCircle,
+  Tag
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/components/ui/use-toast';
@@ -100,6 +100,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       to: "/reports",
     },
     {
+      icon: <Tag className="h-5 w-5" />,
+      label: "Categories",
+      to: "/categories",
+    },
+    {
       icon: <Upload className="h-5 w-5" />,
       label: "Import",
       to: "/import",
@@ -142,18 +147,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     localStorage.setItem('sidebarCollapsed', String(!isCollapsed));
   };
 
-  // Load sidebar state from localStorage
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarCollapsed');
     if (savedState !== null) {
       setIsCollapsed(savedState === 'true');
     }
     
-    // Close mobile menu when location changes
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Theme switcher component for mobile dropdown
   const MobileThemeSwitcher = () => (
     <>
       <DropdownMenuItem disabled className="opacity-70">
@@ -176,7 +178,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Mobile Header */}
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="container flex h-14 items-center">
           <div className="flex justify-between items-center w-full">
@@ -240,7 +241,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
       
-      {/* Mobile Navigation Drawer */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-30 bg-background/95 backdrop-blur-sm md:hidden animate-in">
           <div className="container pt-20 pb-8">
@@ -296,7 +296,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       )}
       
       <div className="flex-1 flex md:container md:pt-4">
-        {/* Desktop Sidebar */}
         <aside className={cn(
           "hidden md:flex flex-col gap-6 border-r pt-4 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-[70px]" : "w-64"
@@ -377,7 +376,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </Link>
             )}
             
-            {/* Desktop Theme Switcher */}
             {!isCollapsed && (
               <div className="border-t mt-4 pt-4 px-2">
                 <p className="mb-2 text-sm font-medium">Theme</p>
@@ -462,7 +460,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </aside>
         
-        {/* Main Content */}
         <main className={cn(
           "flex-1 pt-6 px-4 md:pt-0 md:pl-8 pb-12 overflow-auto",
           isCollapsed && "md:pl-4"
