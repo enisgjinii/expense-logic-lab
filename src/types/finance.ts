@@ -1,3 +1,4 @@
+
 // Transaction type definitions
 export interface Transaction {
   id: string;
@@ -16,6 +17,7 @@ export interface Transaction {
   interval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   tags?: string[];
   attachments?: string[];
+  merchant?: string; // Added missing merchant property
   createdAt?: any;
   updatedAt?: any;
 }
