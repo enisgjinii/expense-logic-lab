@@ -1,9 +1,8 @@
-
 import { loadStripe } from '@stripe/stripe-js';
 import { toast } from 'sonner';
 
 // Initialize Stripe with your publishable key
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_51OFvSJDjgPy7qIYwcKHDEYTg4fh3p6v5vEARkGRgICExs3KCbS3LqITUEsVyBdVlnrgURZBXkRzQZI3uIBeFUXq500fSRNiA1s');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_51R1naLL6VnbqNZjNTXhrZNUufpOtGljQdZFpVxYZhf4DcIvB47lnRpCcOeKzOv1g8ZEiJwHJ8MyXahBvp9eeCWlQ00LLHxLtLN');
 
 // In a real app, this would be tracked in your database or via Stripe webhooks
 // For now, we'll mock subscription status
@@ -26,48 +25,36 @@ export const createCheckoutSession = async (priceId: string) => {
     if (!stripe) {
       throw new Error('Stripe failed to initialize');
     }
-    
-    // In a real app, this would call your backend API
-    // which would create a Stripe Checkout session
-    console.log(`Creating checkout session for price: ${priceId}`);
-    
-    // Mock response - in a real implementation, this would come from your server
-    const session = {
-      id: `cs_test_${Math.random().toString(36).substring(2, 15)}`,
-    };
-    
-    // Simulate successful checkout for demo purposes
-    // In a real app, this would redirect to Stripe Checkout
-    if (priceId === 'price_basic') {
-      currentSubscription = {
-        id: `sub_${Math.random().toString(36).substring(2, 10)}`,
-        name: 'Basic',
-        status: 'active',
-        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days from now
-      };
-      toast.success('Successfully subscribed to Basic plan!');
-    } else if (priceId === 'price_premium') {
-      currentSubscription = {
-        id: `sub_${Math.random().toString(36).substring(2, 10)}`,
-        name: 'Premium',
-        status: 'active',
-        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      };
-      toast.success('Successfully subscribed to Premium plan!');
-    } else if (priceId === 'price_business') {
-      currentSubscription = {
-        id: `sub_${Math.random().toString(36).substring(2, 10)}`,
-        name: 'Business',
-        status: 'active',
-        renewalDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      };
-      toast.success('Successfully subscribed to Business plan!');
+
+    // Call your backend API to create a checkout session
+    const response = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        priceId,
+        successUrl: `${window.location.origin}/settings?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${window.location.origin}/settings`,
+      }),
+    });
+
+    const session = await response.json();
+
+    if (!session || !session.sessionId) {
+      throw new Error('Failed to create checkout session');
     }
-    
-    return { 
-      success: true,
-      subscription: currentSubscription
-    };
+
+    // Redirect to Stripe Checkout
+    const { error } = await stripe.redirectToCheckout({
+      sessionId: session.sessionId,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return { success: true };
   } catch (error) {
     console.error('Stripe checkout error:', error);
     toast.error(error instanceof Error ? error.message : 'Failed to process subscription');
