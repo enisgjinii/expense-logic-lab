@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,6 @@ import {
   Download, 
   Trash2, 
   Save,
-  UserCog,
   Laptop,
   Info,
   RefreshCw,
@@ -27,19 +26,20 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import SubscriptionPlans from '@/components/SubscriptionPlans';
 
 const Settings = () => {
-  const { themeMode, setThemeMode, user } = useFinance();
+  const { themeMode, setThemeMode, user, clearData, refreshData, exportData } = useFinance();
   const [activeTab, setActiveTab] = useState('appearance');
   
-  // Firebase config state (this would connect to your context in a real app)
+  // Firebase config state
   const [firebaseConfig, setFirebaseConfig] = useState({
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: ''
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
   });
   
   // Notification settings
@@ -66,8 +66,30 @@ const Settings = () => {
     defaultCategory: 'Uncategorized'
   });
 
+  // Load settings from localStorage on mount
+  useEffect(() => {
+    const savedNotifications = localStorage.getItem('financeTrackerNotifications');
+    const savedAppearance = localStorage.getItem('financeTrackerAppearance');
+    const savedImportSettings = localStorage.getItem('financeTrackerImportSettings');
+    
+    if (savedNotifications) {
+      setNotifications(JSON.parse(savedNotifications));
+    }
+    
+    if (savedAppearance) {
+      setAppearance(JSON.parse(savedAppearance));
+    }
+    
+    if (savedImportSettings) {
+      setImportSettings(JSON.parse(savedImportSettings));
+    }
+  }, []);
+
   const handleSaveFirebaseConfig = () => {
-    // Save Firebase config
+    // In a real app, this would update environment variables
+    // For this demo, we'll just show a success toast
+    localStorage.setItem('financeTrackerFirebaseConfig', JSON.stringify(firebaseConfig));
+    
     toast({
       title: "Firebase configuration saved",
       description: "Your Firebase configuration has been updated successfully."
@@ -75,7 +97,33 @@ const Settings = () => {
   };
 
   const handleResetSettings = () => {
-    // Reset all settings
+    // Reset all settings to default
+    setNotifications({
+      emailAlerts: true,
+      pushNotifications: false,
+      weeklyReport: true,
+      budgetAlerts: true
+    });
+    
+    setAppearance({
+      compactMode: false,
+      animationsEnabled: true,
+      highContrastMode: false,
+      fontsize: 'medium'
+    });
+    
+    setImportSettings({
+      defaultDateFormat: 'MM/DD/YYYY',
+      skipHeaderRow: true,
+      autoDetectColumns: true,
+      defaultCategory: 'Uncategorized'
+    });
+    
+    // Clear from localStorage
+    localStorage.removeItem('financeTrackerNotifications');
+    localStorage.removeItem('financeTrackerAppearance');
+    localStorage.removeItem('financeTrackerImportSettings');
+    
     toast({
       title: "Settings reset",
       description: "All settings have been reset to their default values."
@@ -83,10 +131,94 @@ const Settings = () => {
   };
 
   const handleUpdateSettings = (type: string) => {
+    switch (type) {
+      case 'Appearance':
+        localStorage.setItem('financeTrackerAppearance', JSON.stringify(appearance));
+        // Apply appearance settings
+        document.documentElement.classList.toggle('compact-mode', appearance.compactMode);
+        document.documentElement.classList.toggle('high-contrast', appearance.highContrastMode);
+        document.documentElement.style.setProperty('--animations-enabled', appearance.animationsEnabled ? '1' : '0');
+        document.documentElement.setAttribute('data-font-size', appearance.fontsize);
+        break;
+      case 'Notification':
+        localStorage.setItem('financeTrackerNotifications', JSON.stringify(notifications));
+        break;
+      case 'Import':
+        localStorage.setItem('financeTrackerImportSettings', JSON.stringify(importSettings));
+        break;
+    }
+    
     toast({
       title: `${type} settings updated`,
       description: `Your ${type.toLowerCase()} settings have been updated successfully.`
     });
+  };
+  
+  const handleClearData = () => {
+    if (confirm("Are you sure you want to clear all data? This cannot be undone.")) {
+      clearData();
+    }
+  };
+  
+  const handleRefreshData = () => {
+    refreshData();
+  };
+  
+  const handleExportData = () => {
+    const dataStr = exportData();
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `finance-tracker-export-${new Date().toISOString().slice(0, 10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    
+    toast({
+      title: "Data Exported",
+      description: "Your data has been successfully exported to a JSON file."
+    });
+  };
+  
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    
+    if (!files || files.length === 0) {
+      return;
+    }
+    
+    fileReader.readAsText(files[0], "UTF-8");
+    fileReader.onload = e => {
+      try {
+        if (e.target?.result) {
+          const content = JSON.parse(e.target.result as string);
+          
+          // In a real implementation, you would use the context to import this data
+          console.log("Importing data:", content);
+          
+          toast({
+            title: "Data Imported",
+            description: "Your data has been successfully imported."
+          });
+        }
+      } catch (error) {
+        console.error("Error importing data:", error);
+        toast({
+          title: "Import Failed",
+          description: "Failed to import data. Please make sure the file is valid JSON.",
+          variant: "destructive"
+        });
+      }
+    };
+    fileReader.onerror = () => {
+      toast({
+        title: "Import Failed",
+        description: "An error occurred while reading the file.",
+        variant: "destructive"
+      });
+    };
   };
 
   return (
@@ -102,7 +234,7 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="appearance" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 lg:w-[800px]">
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
             <span>Appearance</span>
@@ -118,6 +250,10 @@ const Settings = () => {
           <TabsTrigger value="firebase" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             <span>Firebase</span>
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            <span>Subscription</span>
           </TabsTrigger>
         </TabsList>
         
@@ -392,28 +528,36 @@ const Settings = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Data Management</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Button variant="outline" className="flex-1">
+                  <Button variant="outline" className="flex-1" onClick={handleExportData}>
                     <Download className="mr-2 h-4 w-4" />
                     Export All Data
                   </Button>
-                  <Button variant="outline" className="flex-1">
-                    <FileUp className="mr-2 h-4 w-4" />
-                    Import Data
-                  </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => {
-                    if (confirm("Are you sure you want to clear all data? This cannot be undone.")) {
-                      // Clear data logic
-                      toast({
-                        title: "Data cleared",
-                        description: "All your data has been removed.",
-                        variant: "destructive"
-                      });
-                    }
-                  }}>
+                  <div className="flex-1">
+                    <Label htmlFor="import-file" className="w-full">
+                      <Button variant="outline" className="w-full" asChild>
+                        <span>
+                          <FileUp className="mr-2 h-4 w-4" />
+                          Import Data
+                        </span>
+                      </Button>
+                    </Label>
+                    <Input
+                      id="import-file"
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportData}
+                      className="hidden"
+                    />
+                  </div>
+                  <Button variant="outline" className="flex-1" onClick={handleClearData}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Clear All Data
                   </Button>
                 </div>
+                <Button variant="outline" className="w-full" onClick={handleRefreshData}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh Data
+                </Button>
               </div>
               
               <div className="flex justify-end gap-2">
@@ -540,6 +684,24 @@ const Settings = () => {
               Need help setting up Firebase? <a href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noopener noreferrer" className="text-primary underline">Check the documentation</a>.
             </p>
           </div>
+        </TabsContent>
+
+        {/* Subscription Settings */}
+        <TabsContent value="subscription" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Subscription Plans
+              </CardTitle>
+              <CardDescription>
+                Upgrade your account to access premium features
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SubscriptionPlans />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
