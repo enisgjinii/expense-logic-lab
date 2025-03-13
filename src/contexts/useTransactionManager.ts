@@ -85,7 +85,7 @@ export const useTransactionManager = (user: any) => {
       }
 
       // For testing, let's import only 4 transactions
-      const newTransactions = transactions.slice(0, 4);
+      const newTransactions = transactions.slice(0, 1000);
 
       if (user) {
         await saveTransactionsBatch(user.uid, newTransactions);
@@ -182,6 +182,52 @@ export const useTransactionManager = (user: any) => {
     }
   };
 
+  // Add the missing functions that were in the error messages
+  const clearData = () => {
+    setTransactions([]);
+    setStats(initialStats);
+    saveTransactionsToLocalStorage([]);
+    toast({ 
+      title: "Data Cleared", 
+      description: "All transaction data has been cleared" 
+    });
+  };
+
+  const refreshData = async () => {
+    if (user) {
+      await fetchTransactionsFromFirebase();
+      toast({ 
+        title: "Data Refreshed", 
+        description: "Your transaction data has been refreshed" 
+      });
+    } else {
+      toast({ 
+        title: "Not Logged In", 
+        description: "Please log in to refresh your data", 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const exportData = () => {
+    try {
+      const dataStr = JSON.stringify(transactions);
+      toast({ 
+        title: "Data Exported", 
+        description: "Your transaction data has been exported" 
+      });
+      return dataStr;
+    } catch (error: any) {
+      console.error("Error exporting data:", error);
+      toast({ 
+        title: "Export Failed", 
+        description: "Failed to export data: " + error.message, 
+        variant: "destructive" 
+      });
+      return "";
+    }
+  };
+
   return {
     transactions,
     stats,
@@ -192,6 +238,9 @@ export const useTransactionManager = (user: any) => {
     importXLS,
     addTransaction,
     updateTransaction,
-    deleteTransaction
+    deleteTransaction,
+    clearData,
+    refreshData,
+    exportData
   };
 };
