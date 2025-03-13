@@ -95,7 +95,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
       const matchesSearch = [
         tx.account.toLowerCase(),
         tx.category.toLowerCase(),
-        (tx.note ?? '').toLowerCase()
+        (tx.notes ?? '').toLowerCase()
       ].some(str => str.includes(searchTerm.toLowerCase()));
 
       const matchesType = typeFilter ? tx.type === typeFilter : true;
@@ -162,7 +162,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
 
   // CSV Export
   const handleExportCSV = () => {
-    const headers = ['Date', 'Account', 'Category', 'Amount', 'Type', 'Payment', 'Notes'];
+    const headers = ['Date', 'Account', 'Category', 'Amount', 'Type', 'Payment', 'notess'];
     const csvRows = [headers.join(',')];
     sortedTransactions.forEach(tx => {
       const row = [
@@ -172,7 +172,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
         (tx.type === 'Income' ? '+' : '-') + tx.amount,
         tx.type,
         (tx.payment_type ?? 'TRANSFER').replace('_', ' '),
-        tx.note ?? ''
+        tx.notes ?? ''
       ];
       csvRows.push(row.join(','));
     });
@@ -406,7 +406,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                     <span className="text-sm md:text-base">Payment</span> {/* Adjusted text size */}
                   </TableHead>
                   <TableHead className="hidden md:table-cell px-2 md:px-4"> {/* Keep hidden on mobile but show on md+ */}
-                    <span className="text-sm md:text-base">Notes</span> {/* Adjusted text size */}
+                    <span className="text-sm md:text-base">notess</span> {/* Adjusted text size */}
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -458,7 +458,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({ transactions }) =
                         </Badge>
                       </TableCell>
                       <TableCell className="hidden md:table-cell px-2 md:px-4 text-muted-foreground text-sm truncate"> {/* Keep hidden on mobile but show on md+, adjusted padding, text size and truncate */}
-                        {tx.note || '-'}
+                        {tx.notes || '-'}
                       </TableCell>
                     </TableRow>
                   ))
