@@ -1,18 +1,21 @@
 
-// Modifying FinanceContext.tsx to fix the TypeScript error and remove Stripe functionality
+// Modifying FinanceContext.tsx to fix the TypeScript errors
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTransactionManager } from './useTransactionManager';
 import { useAuthManager } from './useAuthManager';
 import { useBudgetManager } from './useBudgetManager';
 import { useThemeManager } from './useThemeManager';
-import { DashboardStats, Budget, Transaction } from '@/types/finance';
+import { DashboardStats, Budget, Transaction, BudgetSummary } from '@/types/finance';
 
 interface FinanceContextProps {
   user: any | null;
   isAuthenticated: boolean;
   loading: boolean;
+  isAuthLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   transactions: Transaction[];
@@ -24,11 +27,15 @@ interface FinanceContextProps {
   fetchTransactionsFromFirebase: () => Promise<void>;
   isLoading: boolean;
   budgets: Budget[];
+  budgetSummaries: BudgetSummary[];
   addBudget: (budget: Budget) => Promise<void>;
   updateBudget: (budget: Budget) => Promise<void>;
   deleteBudget: (id: string) => Promise<void>;
   themeMode: 'light' | 'dark' | 'system';
   setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
+  clearData: () => void;
+  refreshData: () => Promise<void>;
+  exportData: () => string;
 }
 
 const FinanceContext = createContext<FinanceContextProps | undefined>(undefined);
@@ -36,11 +43,9 @@ const FinanceContext = createContext<FinanceContextProps | undefined>(undefined)
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { 
     user, 
-    isAuthenticated, 
-    loading, 
-    login, 
-    signup, 
-    loginWithGoogle, 
+    isAuthLoading, 
+    signIn, 
+    signUp, 
     logout 
   } = useAuthManager();
   
@@ -52,11 +57,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     updateTransaction,
     deleteTransaction,
     importXLS,
-    fetchTransactionsFromFirebase
+    fetchTransactionsFromFirebase,
+    clearData,
+    refreshData,
+    exportData
   } = useTransactionManager(user);
   
   const {
     budgets,
+    budgetSummaries,
     addBudget,
     updateBudget,
     deleteBudget,
@@ -71,11 +80,14 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     <FinanceContext.Provider
       value={{
         user,
-        isAuthenticated,
-        loading,
-        login,
-        signup,
-        loginWithGoogle,
+        isAuthenticated: !!user,
+        loading: isLoading || isAuthLoading,
+        isAuthLoading,
+        login: signIn,
+        signIn,
+        signup: signUp,
+        signUp,
+        loginWithGoogle: () => Promise.resolve(), // Placeholder for now
         logout,
         transactions,
         stats,
@@ -86,11 +98,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         fetchTransactionsFromFirebase,
         isLoading,
         budgets,
+        budgetSummaries,
         addBudget,
         updateBudget,
         deleteBudget,
         themeMode,
-        setThemeMode
+        setThemeMode,
+        clearData,
+        refreshData,
+        exportData
       }}
     >
       {children}
