@@ -1,38 +1,64 @@
 
-export type TransactionType = 'Income' | 'Expense';
-
-export type PaymentType = 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'CASH';
-
+// Transaction type definitions
 export interface Transaction {
   id: string;
-  account: string;
-  category: string;
+  type: 'Income' | 'Expense' | 'Transfer';
   amount: number;
-  type: TransactionType;
-  payment_type: PaymentType;
-  note: string;
+  currency: string;
   date: string;
+  description: string;
+  category: string;
+  account: string;
+  payment_type?: 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'CASH';
+  payee?: string;
+  notes?: string;
+  note?: string; // Adding for backward compatibility
+  recurring?: boolean;
+  interval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  tags?: string[];
+  attachments?: string[];
+  merchant?: string; // Added missing merchant property
+  createdAt?: any;
+  updatedAt?: any;
 }
-
+// Budget definitions
+export interface Budget {
+  id: string;
+  category: string;
+  name?: string; // Adding name property for budget
+  amount: number;
+  period: 'weekly' | 'monthly' | 'yearly';
+  createdAt?: any;
+  updatedAt?: any;
+  color?: string;
+}
+export interface BudgetSummary {
+  budget: Budget;
+  spent: number;
+  remaining: number;
+  percentage: number;
+}
+// Dashboard/Stats definitions
 export interface CategorySummary {
   category: string;
   total: number;
   percentage: number;
   color: string;
 }
-
+export interface AccountSummary {
+  account: string;
+  balance: number;
+  percentage: number;
+  color: string;
+  total?: number; // Adding for compatibility with AccountsOverview
+}
 export interface MonthlyData {
   month: string;
   income: number;
   expense: number;
+  balance: number;
+  categories?: CategorySummary[];
 }
-
-export interface AccountSummary {
-  account: string;
-  total: number;
-  percentage: number;
-}
-
 export interface DashboardStats {
   totalIncome: number;
   totalExpense: number;
@@ -42,25 +68,26 @@ export interface DashboardStats {
   byMonth: MonthlyData[];
   recentTransactions: Transaction[];
 }
-
-export interface Budget {
-  id: string;
-  category: string;
-  amount: number;
-  period: 'monthly' | 'weekly' | 'yearly';
-  createdAt: string;
+// Firebase types
+export interface FirebaseConfig {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
 }
-
-export interface BudgetSummary {
-  budget: Budget;
-  spent: number;
-  remaining: number;
-  percentage: number;
+// User settings
+export interface UserSettings {
+  themeMode: 'light' | 'dark' | 'system';
+  currency: string;
+  language: string;
+  dateFormat: string;
+  defaultAccount: string;
+  defaultCategory: string;
+  firebaseConfig?: FirebaseConfig;
 }
-
-export interface User {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-}
+// Export format types
+export type ExportFormat = 'csv' | 'json' | 'xlsx';
+// Import format types
+export type ImportFormat = 'csv' | 'xls' | 'xlsx' | 'json';

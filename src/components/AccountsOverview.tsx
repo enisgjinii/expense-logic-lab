@@ -10,7 +10,7 @@ interface AccountsOverviewProps {
 }
 
 const AccountsOverview: React.FC<AccountsOverviewProps> = ({ accounts }) => {
-  const total = accounts.reduce((sum, account) => sum + account.total, 0);
+  const total = accounts.reduce((sum, account) => sum + (account.total || account.balance), 0);
   
   return (
     <Card className="h-full">
@@ -27,12 +27,11 @@ const AccountsOverview: React.FC<AccountsOverviewProps> = ({ accounts }) => {
             <div key={index} className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="font-medium">{account.account}</span>
-                <span className="text-sm">{formatCurrency(account.total)}</span>
+                <span className="text-sm">{formatCurrency(account.total || account.balance)}</span>
               </div>
               <Progress 
                 value={account.percentage} 
                 className="h-2" 
-                // Remove the indicatorClassName property
               />
               <div className="text-xs text-muted-foreground">
                 {account.percentage.toFixed(1)}% of total

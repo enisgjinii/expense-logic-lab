@@ -6,6 +6,8 @@ import { CategorySummary } from '@/types/finance';
 
 interface CategoryChartProps {
   data: CategorySummary[];
+  selectedCategory?: string | null;
+  onCategorySelect?: (category: string) => void;
 }
 
 const RADIAN = Math.PI / 180;
@@ -40,7 +42,7 @@ const CustomLabel = ({
   );
 };
 
-const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
+const CategoryChart: React.FC<CategoryChartProps> = ({ data, selectedCategory, onCategorySelect }) => {
   // Take top 5 categories, combine the rest into "Others"
   const processedData = React.useMemo(() => {
     if (data.length <= 5) return data;
@@ -64,6 +66,12 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
     return [...topCategories, others];
   }, [data]);
 
+  const handleClick = (data: any, index: number) => {
+    if (onCategorySelect) {
+      onCategorySelect(data.category);
+    }
+  };
+
   return (
     <Card className="h-[400px] bg-card/60 backdrop-blur-sm shadow-sm border animate-in">
       <CardHeader>
@@ -83,9 +91,16 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
                 fill="#8884d8"
                 dataKey="total"
                 nameKey="category"
+                onClick={handleClick}
               >
                 {processedData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+                  <Cell 
+                    key={`cell-${index}`} 
+                    fill={entry.color} 
+                    opacity={selectedCategory && entry.category !== selectedCategory ? 0.5 : 1}
+                    stroke={selectedCategory && entry.category === selectedCategory ? "#fff" : "none"}
+                    strokeWidth={2}
+                  />
                 ))}
               </Pie>
               <Tooltip 
@@ -101,6 +116,7 @@ const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
                     {value}
                   </span>
                 )}
+                onClick={({value}) => onCategorySelect && onCategorySelect(value)}
               />
             </PieChart>
           </ResponsiveContainer>

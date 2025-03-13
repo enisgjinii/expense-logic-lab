@@ -30,8 +30,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
     amount: 0,
     type: 'Expense',
     payment_type: 'TRANSFER',
-    note: '',
-    date: new Date().toISOString().slice(0, 16)
+    notes: '',
+    date: new Date().toISOString().slice(0, 16),
+    description: '',
+    currency: 'USD'
   });
   
   const [newAccount, setNewAccount] = useState('');
@@ -94,8 +96,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
         amount: formData.amount,
         type: formData.type,
         payment_type: formData.payment_type,
-        note: formData.note,
-        date: new Date(formData.date).toISOString().slice(0, 19).replace('T', ' ')
+        notes: formData.notes,
+        date: new Date(formData.date).toISOString().slice(0, 19).replace('T', ' '),
+        description: formData.description,
+        currency: formData.currency
       };
       
       await addTransaction(newTransaction);
@@ -112,8 +116,10 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
         amount: 0,
         type: 'Expense',
         payment_type: 'TRANSFER',
-        note: '',
-        date: new Date().toISOString().slice(0, 16)
+        notes: '',
+        date: new Date().toISOString().slice(0, 16),
+        description: '',
+        currency: 'USD'
       });
       
       setNewAccount('');
@@ -302,11 +308,11 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
             </div>
             
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="note">Note (Optional)</Label>
+              <Label htmlFor="notes">Note (Optional)</Label>
               <Textarea
-                id="note"
-                name="note"
-                value={formData.note}
+                id="notes"
+                name="notes"
+                value={formData.notes}
                 onChange={handleChange}
                 placeholder="Add details about this transaction..."
                 className="resize-none"

@@ -9,11 +9,16 @@ import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budget from "./pages/Budget";
 import Import from "./pages/Import";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Categories from "./pages/Categories";
 import { FinanceProvider } from "./contexts/FinanceContext";
 import { useFinance } from "./contexts/FinanceContext";
 
+// Initialize query client for React Query
 const queryClient = new QueryClient();
 
 // Protected route component
@@ -68,6 +73,38 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Layout><Import /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/reports" 
+        element={
+          <ProtectedRoute>
+            <Layout><Reports /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/categories" 
+        element={
+          <ProtectedRoute>
+            <Layout><Categories /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          <ProtectedRoute>
+            <Layout><Settings /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <Layout><Profile /></Layout>
           </ProtectedRoute>
         } 
       />

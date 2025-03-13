@@ -3,15 +3,23 @@ import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2, Upload, Download, FileText, AlertCircle, Eye, EyeOff, CheckCircle2, FileWarning, Info } from 'lucide-react';
+import { Loader2, Upload, Download, FileText, AlertCircle, FileWarning } from 'lucide-react';
 import { Transaction } from '@/types/finance';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { parseXLS } from '@/utils/finance-utils';
+import { Timestamp } from 'firebase/firestore'; // For Firestore date fields
+
+// Helper to convert Excel serial dates (e.g. 45468.0833) to JS Dates
+const excelDateToJSDate = (serial: number): Date => {
+  const utcDays = Math.floor(serial - 25569);
+  const fractionalDay = serial - Math.floor(serial);
+  const totalSeconds = utcDays * 86400 + Math.round(fractionalDay * 86400);
+  return new Date(totalSeconds * 1000);
+};
 
 const XLSImporter: React.FC = () => {
   const { importXLS, isLoading } = useFinance();
@@ -59,7 +67,19 @@ const XLSImporter: React.FC = () => {
         }
         // Parse XLS data to generate preview transactions
         const previewTransactions = parseXLS(data as ArrayBuffer);
-        setPreviewData(previewTransactions.slice(0, 500));
+
+        // Convert Excel serial dates to ISO strings (if it's a number)
+        const convertedTransactions = previewTransactions.map((t) => {
+          if (typeof t.date === 'number') {
+            return {
+              ...t,
+              date: excelDateToJSDate(t.date).toISOString(),
+            };
+          }
+          return t;
+        });
+
+        setPreviewData(convertedTransactions.slice(0, 2000));
         toast({
           title: "File Loaded",
           description: `XLS file loaded with ${previewTransactions.length} transactions. You can preview before importing.`,
@@ -124,9 +144,20 @@ const XLSImporter: React.FC = () => {
     try {
       setErrors([]);
       setImportProgress(0);
-      // Simulate progress before calling the import function
-      const progressInterval = simulateProgressAnimation(() => {
-        importXLS(selectedFile);
+      // Simulate progress
+      const progressInterval = simulateProgressAnimation(async () => {
+        // Convert each preview item’s date to Firestore Timestamp
+        const transactionsReadyForImport = previewData.map((t) => {
+          return {
+            ...t,
+            date: t.date,
+          };
+        });
+
+        // Now call your import function with the updated array
+        // The first argument is still the File, second is the transactions array
+        await importXLS(selectedFile, transactionsReadyForImport);
+
         setSelectedFile(null);
         setPreviewData([]);
       });
@@ -235,12 +266,19 @@ const XLSImporter: React.FC = () => {
                           <TableCell>{transaction.category}</TableCell>
                           <TableCell className="font-mono">${transaction.amount.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant={transaction.type === 'Income' ? 'success' : 'destructive'} className="capitalize">
+                            <Badge
+                              variant={transaction.type === 'Income' ? 'success' : 'destructive'}
+                              className="capitalize"
+                            >
                               {transaction.type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs">{transaction.payment_type.replace('_', ' ')}</TableCell>
-                          <TableCell className="text-sm">{new Date(transaction.date).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-xs">
+                            {(transaction.payment_type || 'TRANSFER').replace('_', ' ')}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
