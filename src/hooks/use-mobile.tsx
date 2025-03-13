@@ -5,9 +5,13 @@ const MOBILE_BREAKPOINT = 768
 const TABLET_BREAKPOINT = 1024
 
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+  const [isMobile, setIsMobile] = React.useState<boolean>(
+    typeof window !== 'undefined' ? window.innerWidth < MOBILE_BREAKPOINT : false
+  )
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
     
     const onChange = () => {
@@ -29,13 +33,18 @@ export function useIsMobile() {
     }
   }, [])
 
-  return !!isMobile
+  return isMobile
 }
 
 export function useIsTablet() {
-  const [isTablet, setIsTablet] = React.useState<boolean | undefined>(undefined)
+  const [isTablet, setIsTablet] = React.useState<boolean>(
+    typeof window !== 'undefined' ? 
+      (window.innerWidth >= MOBILE_BREAKPOINT && window.innerWidth < TABLET_BREAKPOINT) : false
+  )
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
     const checkSize = () => {
       const width = window.innerWidth
       setIsTablet(width >= MOBILE_BREAKPOINT && width < TABLET_BREAKPOINT)
@@ -54,7 +63,7 @@ export function useIsTablet() {
     }
   }, [])
 
-  return !!isTablet
+  return isTablet
 }
 
 export function useDeviceSize() {
@@ -64,11 +73,22 @@ export function useDeviceSize() {
   })
 
   React.useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    // Use a debounce function to avoid excessive updates
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    
     const handleResize = () => {
-      setSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      })
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      
+      timeoutId = setTimeout(() => {
+        setSize({
+          width: window.innerWidth,
+          height: window.innerHeight,
+        })
+      }, 100) // 100ms debounce
     }
     
     // Initialize
@@ -76,9 +96,15 @@ export function useDeviceSize() {
     
     // Add event listeners
     window.addEventListener("resize", handleResize)
-    window.addEventListener("orientationchange", handleResize)
+    window.addEventListener("orientationchange", () => {
+      // Wait slightly longer for orientation changes as they can take longer
+      setTimeout(handleResize, 200)
+    })
     
     return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
       window.removeEventListener("resize", handleResize)
       window.removeEventListener("orientationchange", handleResize)
     }

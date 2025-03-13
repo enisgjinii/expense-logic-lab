@@ -343,7 +343,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       )}
       
-      <div className="flex-1 flex md:container md:pt-4">
+      <div className="flex-1 flex md:container-full md:pt-4">
         <aside className={cn(
           "hidden md:flex flex-col gap-4 sm:gap-6 border-r pt-4 transition-all duration-300 ease-in-out",
           isCollapsed ? "w-[60px]" : "w-64"
