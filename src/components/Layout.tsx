@@ -425,7 +425,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             )}
             
             {!isCollapsed && (
-              <div className="border-t mt-4 pt-4 px-2">
+              <div className="border-t mt-4 mb-4 pt-4 px-2">
                 <p className="mb-2 text-xs sm:text-sm font-medium">Theme</p>
                 <div className="flex items-center gap-2">
                   <Button 
@@ -493,7 +493,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </DropdownMenu>
             )}
             
-            <div className="mt-4 flex justify-center">
+            {/* <div className="mt-4 flex justify-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -504,7 +504,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <TooltipContent>Help & Support</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            </div>
+            </div> */}
           </div>
         </aside>
         
