@@ -79,7 +79,7 @@ const XLSImporter: React.FC = () => {
           return t;
         });
 
-        setPreviewData(convertedTransactions.slice(0, 500));
+        setPreviewData(convertedTransactions.slice(0, 2000));
         toast({
           title: "File Loaded",
           description: `XLS file loaded with ${previewTransactions.length} transactions. You can preview before importing.`,

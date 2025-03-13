@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,8 +100,6 @@ const Reports = () => {
     });
     
     setFilteredTransactions(filtered);
-    
-    // Prepare data for charts
     prepareChartData(filtered);
     
   }, [transactions, dateRange, categoryFilter, accountFilter, typeFilter, sortOrder, searchTerm, timeframe]);
@@ -154,8 +151,6 @@ const Reports = () => {
     
     // Time-based analysis
     const timeMap = new Map<string, { income: number; expense: number; balance: number }>();
-    
-    // Initialize time periods based on the selected timeframe
     const formatStr = timeframe === 'daily' ? 'yyyy-MM-dd' : timeframe === 'weekly' ? 'yyyy-ww' : 'yyyy-MM';
     
     filtered.forEach(t => {
@@ -207,11 +202,7 @@ const Reports = () => {
           balance: data.balance,
         };
       })
-      .sort((a, b) => {
-        if (a.time < b.time) return -1;
-        if (a.time > b.time) return 1;
-        return 0;
-      });
+      .sort((a, b) => a.time.localeCompare(b.time));
     
     setTimeframeData(timeChartData);
   };
@@ -236,9 +227,7 @@ const Reports = () => {
   const netBalance = totalIncome - totalExpense;
   
   // Custom label for pie chart
-  const renderCustomizedLabel = ({ name, percent }: any) => {
-    return `${name}: ${(percent * 100).toFixed(0)}%`;
-  };
+  const renderCustomizedLabel = ({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`;
   
   // Reset filters
   const resetFilters = () => {
@@ -255,12 +244,11 @@ const Reports = () => {
   
   // Export report data
   const exportReport = () => {
-    // Export logic would go here
     console.log('Exporting report data...');
   };
   
   return (
-    <div className="space-y-6 pb-8 animate-in">
+    <div className="max-w-7xl mx-auto p-4 space-y-6 pb-8 animate-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Financial Reports</h1>
@@ -284,7 +272,7 @@ const Reports = () => {
           <CardDescription>Customize your report view</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date-range">Date Range</Label>
               <DateRangePicker 
@@ -388,7 +376,7 @@ const Reports = () => {
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/50">
               <CardContent className="pt-6">
                 <div className="flex justify-between items-center">
@@ -458,7 +446,7 @@ const Reports = () => {
           </div>
           
           <Tabs defaultValue="overview" value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'advanced')}>
-            <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsList className="grid grid-cols-2 mb-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="advanced">Advanced Analysis</TabsTrigger>
             </TabsList>
@@ -472,7 +460,7 @@ const Reports = () => {
                     <CardDescription>Distribution of expenses across categories</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
+                    <div className="h-[300px] w-full overflow-x-auto">
                       {categoryData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -481,7 +469,7 @@ const Reports = () => {
                               dataKey="value"
                               cx="50%"
                               cy="50%"
-                              labelLine={true}
+                              labelLine
                               label={renderCustomizedLabel}
                               outerRadius={100}
                               fill="#8884d8"
@@ -490,9 +478,7 @@ const Reports = () => {
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <Tooltip 
-                              formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                            />
+                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
                             <Legend />
                           </PieChart>
                         </ResponsiveContainer>
@@ -512,7 +498,7 @@ const Reports = () => {
                     <CardDescription>Income vs expenses over the selected period</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
+                    <div className="h-[300px] w-full overflow-x-auto">
                       {timeframeData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={timeframeData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -541,7 +527,7 @@ const Reports = () => {
                     <CardDescription>How your balance changed over time</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
+                    <div className="h-[300px] w-full overflow-x-auto">
                       {timeframeData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={timeframeData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -566,14 +552,14 @@ const Reports = () => {
             
             <TabsContent value="advanced" className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* More complex visualizations would go here */}
+                {/* Account Distribution */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Account Distribution</CardTitle>
                     <CardDescription>How your money is distributed among accounts</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
+                    <div className="h-[300px] w-full overflow-x-auto">
                       {accountData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -582,7 +568,7 @@ const Reports = () => {
                               dataKey="value"
                               cx="50%"
                               cy="50%"
-                              labelLine={true}
+                              labelLine
                               label={renderCustomizedLabel}
                               outerRadius={100}
                               fill="#8884d8"
@@ -591,9 +577,7 @@ const Reports = () => {
                                 <Cell key={`cell-${index}`} fill={entry.color} />
                               ))}
                             </Pie>
-                            <Tooltip 
-                              formatter={(value: number) => [formatCurrency(value), 'Amount']}
-                            />
+                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
                             <Legend />
                           </PieChart>
                         </ResponsiveContainer>
@@ -613,12 +597,10 @@ const Reports = () => {
                     <CardDescription>Compare income and expenses</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[300px]">
+                    <div className="h-[300px] w-full overflow-x-auto">
                       {filteredTransactions.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart
-                            width={500}
-                            height={300}
                             data={[
                               { name: 'Income', amount: totalIncome, fill: '#4BC0C0' },
                               { name: 'Expenses', amount: totalExpense, fill: '#FF6384' },
@@ -657,20 +639,21 @@ const Reports = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <div className="bg-muted rounded-lg p-4">
+                      <div className="bg-muted rounded-lg p-4 text-center">
                         <p className="text-sm text-muted-foreground">Total Transactions</p>
                         <h4 className="text-2xl font-bold">{filteredTransactions.length}</h4>
                       </div>
-                      <div className="bg-muted rounded-lg p-4">
+                      <div className="bg-muted rounded-lg p-4 text-center">
                         <p className="text-sm text-muted-foreground">Avg. Transaction</p>
                         <h4 className="text-2xl font-bold">
-                          {formatCurrency(filteredTransactions.length 
-                            ? filteredTransactions.reduce((sum, t) => sum + t.amount, 0) / filteredTransactions.length 
-                            : 0
+                          {formatCurrency(
+                            filteredTransactions.length 
+                              ? filteredTransactions.reduce((sum, t) => sum + t.amount, 0) / filteredTransactions.length 
+                              : 0
                           )}
                         </h4>
                       </div>
-                      <div className="bg-muted rounded-lg p-4">
+                      <div className="bg-muted rounded-lg p-4 text-center">
                         <p className="text-sm text-muted-foreground">Largest Expense</p>
                         <h4 className="text-2xl font-bold">
                           {formatCurrency(Math.max(...filteredTransactions
@@ -679,7 +662,7 @@ const Reports = () => {
                           )}
                         </h4>
                       </div>
-                      <div className="bg-muted rounded-lg p-4">
+                      <div className="bg-muted rounded-lg p-4 text-center">
                         <p className="text-sm text-muted-foreground">Largest Income</p>
                         <h4 className="text-2xl font-bold">
                           {formatCurrency(Math.max(...filteredTransactions
