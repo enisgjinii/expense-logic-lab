@@ -14,9 +14,11 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Categories from "./pages/Categories";
 import { FinanceProvider } from "./contexts/FinanceContext";
 import { useFinance } from "./contexts/FinanceContext";
 
+// Initialize query client for React Query
 const queryClient = new QueryClient();
 
 // Protected route component
@@ -79,6 +81,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Layout><Reports /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/categories" 
+        element={
+          <ProtectedRoute>
+            <Layout><Categories /></Layout>
           </ProtectedRoute>
         } 
       />
