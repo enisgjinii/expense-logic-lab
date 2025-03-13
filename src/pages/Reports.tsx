@@ -1,666 +1,1039 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency } from '@/utils/finance-utils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import DateRangePicker from '@/components/DateRangePicker';
-import { DateRange } from 'react-day-picker';
-import { PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
-import { Download, Filter, ArrowUpDown, BarChart2, PieChart as PieChartIcon, TrendingUp, Calendar, RefreshCw } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, parse, isWithinInterval } from 'date-fns';
-import { CategorySummary, Transaction } from '@/types/finance';
-
-const getRandomColor = () => {
-  const colors = [
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-    '#FF9F40', '#8AC926', '#6A4C93', '#1982C4', '#FFCA3A',
-    '#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93'
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
-};
+import { BarChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, PieChart, Pie, Cell } from 'recharts';
+import { toast } from '@/components/ui/use-toast';
+import { downloadCSV } from '@/utils/export-utils';
+import { BarChart as BarChartIcon, Download, FileType, CreditCard, ArrowUpDown, ChevronDown, ChevronUp, Wallet, LineChart, Eye, EyeOff, AlertCircle, TrendingUp, TrendingDown, Banknote, History, PieChart as PieChartIcon } from 'lucide-react';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 const Reports = () => {
-  const { transactions, stats } = useFinance();
-  const [activeTab, setActiveTab] = useState<'overview' | 'advanced'>('overview');
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date(),
+  const { transactions, stats, budgets, refreshData } = useFinance();
+  const [reportType, setReportType] = useState('expenses');
+  const [timeRange, setTimeRange] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [startYear, setStartYear] = useState('2015');
+  const [endYear, setEndYear] = useState(new Date().getFullYear().toString());
+  const [isLoading, setIsLoading] = useState(false);
+  const [reportData, setReportData] = useState<any[]>([]);
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [accountView, setAccountView] = useState<'basic' | 'advanced'>('basic');
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [accountTransactions, setAccountTransactions] = useState<any[]>([]);
+  const [sortConfig, setSortConfig] = useState<{key: string, direction: 'asc' | 'desc'}>({
+    key: 'balance',
+    direction: 'desc'
   });
+  const [openAccountId, setOpenAccountId] = useState<string | null>(null);
+  const [accountChartType, setAccountChartType] = useState<'pie' | 'bar'>('pie');
+  const [showBalance, setShowBalance] = useState(true);
+  const [accountHistoryPeriod, setAccountHistoryPeriod] = useState('7d');
+  const [accountAnalytics, setAccountAnalytics] = useState<{[key: string]: {
+    trend: 'up' | 'down' | 'stable',
+    changePercentage: number,
+    recentActivity: {date: string, amount: number, description: string, type: string}[],
+    history: {date: string, balance: number}[]
+  }}>({});
+
+  const categories = [...new Set(transactions.map(t => t.category))];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-  const [aggregatedData, setAggregatedData] = useState<any[]>([]);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
-  const [accountData, setAccountData] = useState<any[]>([]);
-  const [timeframeData, setTimeframeData] = useState<any[]>([]);
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
   
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [accountFilter, setAccountFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  
-  const uniqueCategories = Array.from(new Set(transactions.map(t => t.category))).sort();
-  const uniqueAccounts = Array.from(new Set(transactions.map(t => t.account))).sort();
-  
+  const years = [];
+  for (let year = 2015; year <= new Date().getFullYear(); year++) {
+    years.push(year.toString());
+  }
+
+  const accounts = [...new Set(transactions.map(t => t.account))];
+
   useEffect(() => {
-    if (!transactions.length) return;
+    generateReport();
+  }, [reportType, timeRange, categoryFilter, transactions, startYear, endYear]);
+
+  useEffect(() => {
+    if (selectedAccount) {
+      const filteredTransactions = transactions.filter(t => t.account === selectedAccount);
+      setAccountTransactions(filteredTransactions);
+    } else {
+      setAccountTransactions([]);
+    }
+  }, [selectedAccount, transactions]);
+
+  useEffect(() => {
+    if (stats.byAccount.length > 0) {
+      const analytics: {[key: string]: any} = {};
+      
+      stats.byAccount.forEach(account => {
+        const accountTxs = transactions.filter(t => t.account === account.account);
+        const sortedTxs = [...accountTxs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const recentActivity = sortedTxs.slice(0, 5).map(t => ({
+          date: t.date,
+          amount: t.amount,
+          description: t.description,
+          type: t.type
+        }));
+        
+        const today = new Date();
+        const history = [];
+        let runningBalance = account.balance;
+        
+        for (let i = 0; i < 30; i++) {
+          const date = new Date();
+          date.setDate(today.getDate() - i);
+          
+          const randomChange = Math.random() * 200 - 100;
+          runningBalance = i === 0 ? runningBalance : runningBalance - randomChange;
+          
+          history.unshift({
+            date: date.toISOString().split('T')[0],
+            balance: Math.max(0, runningBalance)
+          });
+        }
+        
+        const recentHistory = history.slice(-7);
+        const oldAvg = recentHistory.slice(0, 3).reduce((sum, item) => sum + item.balance, 0) / 3;
+        const newAvg = recentHistory.slice(-3).reduce((sum, item) => sum + item.balance, 0) / 3;
+        const changePercentage = oldAvg > 0 ? ((newAvg - oldAvg) / oldAvg) * 100 : 0;
+        const trend: 'up' | 'down' | 'stable' = 
+          changePercentage > 1 ? 'up' : 
+          changePercentage < -1 ? 'down' : 'stable';
+        
+        analytics[account.account] = {
+          trend,
+          changePercentage,
+          recentActivity,
+          history
+        };
+      });
+      
+      setAccountAnalytics(analytics);
+    }
+  }, [stats.byAccount, transactions]);
+
+  const generateReport = async () => {
+    setIsLoading(true);
     
-    let filtered = [...transactions];
-    
-    if (dateRange?.from && dateRange?.to) {
-      filtered = filtered.filter(t => {
+    try {
+      let startDate = new Date();
+      let endDate = new Date();
+      
+      if (timeRange === 'custom') {
+        startDate = new Date(parseInt(startYear), 0, 1);
+        endDate = new Date(parseInt(endYear), 11, 31, 23, 59, 59);
+      } else if (timeRange === 'month') {
+        startDate.setMonth(endDate.getMonth() - 1);
+      } else if (timeRange === 'quarter') {
+        startDate.setMonth(endDate.getMonth() - 3);
+      } else if (timeRange === 'year') {
+        startDate.setFullYear(endDate.getFullYear() - 1);
+      } else if (timeRange === 'all') {
+        startDate = new Date('2015-01-01');
+      }
+      
+      let filteredTransactions = transactions.filter(t => {
         const transactionDate = new Date(t.date);
-        return isWithinInterval(transactionDate, {
-          start: dateRange.from as Date,
-          end: dateRange.to as Date,
+        const meetsDateCriteria = transactionDate >= startDate && transactionDate <= endDate;
+        const meetsCategoryCriteria = categoryFilter === 'all' || t.category === categoryFilter;
+        const meetsTypeCriteria = reportType === 'all' || 
+                                 (reportType === 'expenses' && t.type === 'Expense') ||
+                                 (reportType === 'income' && t.type === 'Income');
+        
+        return meetsDateCriteria && meetsCategoryCriteria && meetsTypeCriteria;
+      });
+      
+      const monthlyData = new Map();
+      
+      if (timeRange === 'custom' || timeRange === 'all') {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        while (start <= end) {
+          const year = start.getFullYear();
+          const month = start.getMonth();
+          const key = `${year}-${months[month]}`;
+          
+          monthlyData.set(key, { 
+            name: `${months[month]} ${year}`, 
+            income: 0, 
+            expense: 0, 
+            net: 0,
+            year,
+            month: months[month],
+            monthIndex: month
+          });
+          
+          start.setMonth(start.getMonth() + 1);
+        }
+      } else {
+        months.forEach(month => {
+          monthlyData.set(month, { 
+            name: month, 
+            income: 0, 
+            expense: 0, 
+            net: 0,
+            year: new Date().getFullYear(),
+            month,
+            monthIndex: months.indexOf(month)
+          });
         });
+      }
+      
+      filteredTransactions.forEach(t => {
+        const transactionDate = new Date(t.date);
+        const year = transactionDate.getFullYear();
+        const month = months[transactionDate.getMonth()];
+        
+        let key = month;
+        if (timeRange === 'custom' || timeRange === 'all') {
+          key = `${year}-${month}`;
+        }
+        
+        if (!monthlyData.has(key)) {
+          monthlyData.set(key, { 
+            name: timeRange === 'custom' || timeRange === 'all' ? `${month} ${year}` : month, 
+            income: 0, 
+            expense: 0, 
+            net: 0,
+            year,
+            month,
+            monthIndex: transactionDate.getMonth()
+          });
+        }
+        
+        const monthData = monthlyData.get(key);
+        
+        if (t.type === 'Income') {
+          monthData.income += t.amount;
+        } else {
+          monthData.expense += t.amount;
+        }
+        
+        monthData.net = monthData.income - monthData.expense;
+        monthlyData.set(key, monthData);
+      });
+      
+      let data = Array.from(monthlyData.values());
+      
+      data.sort((a, b) => {
+        if (a.year !== b.year) {
+          return a.year - b.year;
+        }
+        return a.monthIndex - b.monthIndex;
+      });
+      
+      if (timeRange === 'month') {
+        data = data.slice(-2);
+      } else if (timeRange === 'quarter') {
+        data = data.slice(-4);
+      } else if (timeRange === 'year') {
+        data = data.slice(-12);
+      }
+      
+      setReportData(data);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast({
+        title: "Report Generation Failed",
+        description: "There was an error generating your report. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleExport = () => {
+    try {
+      const filename = `finance-report-${reportType}-${timeRange}-${new Date().toISOString().split('T')[0]}.csv`;
+      
+      let csvData = reportData.map(item => ({
+        Month: item.name,
+        Income: formatCurrency(item.income),
+        Expense: formatCurrency(item.expense),
+        Net: formatCurrency(item.net)
+      }));
+      
+      downloadCSV(csvData, filename);
+      
+      toast({
+        title: "Report Exported",
+        description: `Your report has been exported as ${filename}`,
+      });
+    } catch (error) {
+      console.error("Error exporting report:", error);
+      toast({
+        title: "Export Failed",
+        description: "There was an error exporting your report. Please try again.",
+        variant: "destructive"
       });
     }
-    
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(t => t.category === categoryFilter);
+  };
+
+  const handleAccountViewChange = (view: 'basic' | 'advanced') => {
+    setAccountView(view);
+    if (view === 'basic') {
+      setSelectedAccount(null);
     }
-    
-    if (accountFilter !== 'all') {
-      filtered = filtered.filter(t => t.account === accountFilter);
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
     }
-    
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(t => t.type === typeFilter);
+    setSortConfig({ key, direction });
+  };
+
+  const sortedAccounts = [...stats.byAccount].sort((a, b) => {
+    if (sortConfig.direction === 'asc') {
+      return a[sortConfig.key as keyof typeof a] > b[sortConfig.key as keyof typeof b] ? 1 : -1;
+    } else {
+      return a[sortConfig.key as keyof typeof a] < b[sortConfig.key as keyof typeof b] ? 1 : -1;
     }
-    
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(t => 
-        t.description?.toLowerCase().includes(term) || 
-        t.notes?.toLowerCase().includes(term) || 
-        t.category.toLowerCase().includes(term) || 
-        t.account.toLowerCase().includes(term) || 
-        t.merchant?.toLowerCase().includes(term)
+  });
+
+  const renderActiveChart = () => {
+    if (reportData.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <p className="text-muted-foreground">No data available for the selected filters</p>
+        </div>
       );
     }
     
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-    });
-    
-    setFilteredTransactions(filtered);
-    prepareChartData(filtered);
-  }, [transactions, dateRange, categoryFilter, accountFilter, typeFilter, sortOrder, searchTerm, timeframe]);
-  
-  const prepareChartData = (filtered: Transaction[]) => {
-    const categoryMap = new Map<string, number>();
-    
-    filtered.forEach(t => {
-      const amount = t.type === 'Expense' ? -t.amount : t.amount;
-      const category = t.category || 'Uncategorized';
-      
-      if (categoryMap.has(category)) {
-        categoryMap.set(category, categoryMap.get(category)! + amount);
-      } else {
-        categoryMap.set(category, amount);
-      }
-    });
-    
-    const categoryChartData = Array.from(categoryMap.entries()).map(([name, value]) => ({
-      name,
-      value: Math.abs(value),
-      color: getRandomColor(),
-    }));
-    
-    setCategoryData(categoryChartData);
-    
-    const accountMap = new Map<string, number>();
-    
-    filtered.forEach(t => {
-      const amount = t.amount;
-      const account = t.account || 'Unknown';
-      
-      if (accountMap.has(account)) {
-        accountMap.set(account, accountMap.get(account)! + (t.type === 'Expense' ? -amount : amount));
-      } else {
-        accountMap.set(account, t.type === 'Expense' ? -amount : amount);
-      }
-    });
-    
-    const accountChartData = Array.from(accountMap.entries()).map(([name, value]) => ({
-      name,
-      value,
-      color: getRandomColor(),
-    }));
-    
-    setAccountData(accountChartData);
-    
-    const timeMap = new Map<string, { income: number; expense: number; balance: number }>();
-    const formatStr = timeframe === 'daily' ? 'yyyy-MM-dd' : timeframe === 'weekly' ? 'yyyy-ww' : 'yyyy-MM';
-    
-    filtered.forEach(t => {
-      let timePeriod;
-      const transactionDate = new Date(t.date);
-      
-      if (timeframe === 'daily') {
-        timePeriod = format(transactionDate, 'yyyy-MM-dd');
-      } else if (timeframe === 'weekly') {
-        timePeriod = format(transactionDate, 'yyyy-ww');
-      } else {
-        timePeriod = format(transactionDate, 'yyyy-MM');
-      }
-      
-      if (!timeMap.has(timePeriod)) {
-        timeMap.set(timePeriod, { income: 0, expense: 0, balance: 0 });
-      }
-      
-      const current = timeMap.get(timePeriod)!;
-      
-      if (t.type === 'Income') {
-        current.income += t.amount;
-        current.balance += t.amount;
-      } else if (t.type === 'Expense') {
-        current.expense += t.amount;
-        current.balance -= t.amount;
-      }
-      
-      timeMap.set(timePeriod, current);
-    });
-    
-    const timeChartData = Array.from(timeMap.entries())
-      .map(([time, data]) => {
-        let displayTime;
-        
-        if (timeframe === 'daily') {
-          displayTime = format(parse(time, 'yyyy-MM-dd', new Date()), 'MMM dd');
-        } else if (timeframe === 'weekly') {
-          const [year, week] = time.split('-');
-          displayTime = `Week ${week}`;
-        } else {
-          displayTime = format(parse(time + '-01', 'yyyy-MM-dd', new Date()), 'MMM yyyy');
-        }
-        
-        return {
-          time: displayTime,
-          income: data.income,
-          expense: data.expense,
-          balance: data.balance,
-        };
-      })
-      .sort((a, b) => a.time.localeCompare(b.time));
-    
-    setTimeframeData(timeChartData);
-  };
-  
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-  
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'Income')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const totalExpense = filteredTransactions
-    .filter(t => t.type === 'Expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-    
-  const netBalance = totalIncome - totalExpense;
-  
-  const renderCustomizedLabel = ({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`;
-  
-  const resetFilters = () => {
-    setCategoryFilter('all');
-    setAccountFilter('all');
-    setTypeFilter('all');
-    setSortOrder('desc');
-    setSearchTerm('');
-    setDateRange({
-      from: subDays(new Date(), 30),
-      to: new Date(),
-    });
-  };
-  
-  const exportReport = () => {
-    console.log('Exporting report data...');
-  };
-  
-  return (
-    <div className="max-w-7xl mx-auto p-2 sm:p-4 space-y-4 sm:space-y-6 pb-8 animate-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Financial Reports</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Analyze your transactions and financial patterns</p>
+    if (viewMode === 'chart') {
+      return (
+        <ResponsiveContainer width="100%" height={400}>
+          <BarChart data={reportData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis tickFormatter={(value) => formatCurrency(Number(value)).split('.')[0]} />
+            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+            <Legend />
+            <Bar dataKey="income" name="Income" fill="#4ade80" />
+            <Bar dataKey="expense" name="Expense" fill="#f43f5e" />
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    } else {
+      return (
+        <div className="border rounded-md overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Period</TableHead>
+                <TableHead>Income</TableHead>
+                <TableHead>Expense</TableHead>
+                <TableHead>Net</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reportData.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{item.name}</TableCell>
+                  <TableCell className="text-income">{formatCurrency(item.income)}</TableCell>
+                  <TableCell className="text-expense">{formatCurrency(item.expense)}</TableCell>
+                  <TableCell className={item.net >= 0 ? "text-income" : "text-expense"}>
+                    {formatCurrency(item.net)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={resetFilters} className="flex gap-2 items-center text-xs sm:text-sm">
-            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Reset</span>
+      );
+    }
+  };
+
+  const getAccountHistoryData = (accountName: string) => {
+    if (!accountAnalytics[accountName]) return [];
+    
+    const history = [...accountAnalytics[accountName].history];
+    
+    if (accountHistoryPeriod === '7d') {
+      return history.slice(-7);
+    } else if (accountHistoryPeriod === '14d') {
+      return history.slice(-14);
+    } else if (accountHistoryPeriod === '30d') {
+      return history.slice(-30);
+    }
+    
+    return history;
+  };
+  
+  const getAccountHealthStatus = (account: any) => {
+    const analytics = accountAnalytics[account.account];
+    if (!analytics) return { status: 'neutral', message: 'Insufficient data' };
+    
+    if (analytics.trend === 'up' && analytics.changePercentage > 5) {
+      return { status: 'positive', message: 'Growing balance' };
+    } else if (analytics.trend === 'down' && analytics.changePercentage < -5) {
+      return { status: 'negative', message: 'Declining balance' };
+    } else if (account.balance < 100) {
+      return { status: 'warning', message: 'Low balance' };
+    }
+    
+    return { status: 'neutral', message: 'Stable account' };
+  };
+
+  const renderAccountsView = () => {
+    if (accountView === 'basic') {
+      return (
+        <Card className="md:col-span-2 lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <div>
+              <CardTitle className="text-lg">Financial Accounts</CardTitle>
+              <CardDescription>
+                Account balances and distribution
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleAccountViewChange('advanced')}
+            >
+              Advanced View
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('account')}>
+                      Account {sortConfig.key === 'account' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                      )}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('balance')}>
+                      Balance {sortConfig.key === 'balance' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                      )}
+                    </TableHead>
+                    <TableHead className="cursor-pointer" onClick={() => handleSort('percentage')}>
+                      Percentage {sortConfig.key === 'percentage' && (
+                        sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                      )}
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedAccounts.map((account, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: account.color || COLORS[index % COLORS.length] }}
+                          />
+                          {account.account}
+                        </div>
+                      </TableCell>
+                      <TableCell className={account.balance >= 0 ? "text-income" : "text-expense"}>
+                        {formatCurrency(account.balance)}
+                      </TableCell>
+                      <TableCell>{account.percentage.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    } else {
+      return (
+        <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg">Advanced Account Analysis</CardTitle>
+                <CardDescription>
+                  Detailed view of your financial accounts
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowBalance(!showBalance)}
+                >
+                  {showBalance ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+                  {showBalance ? 'Hide Balances' : 'Show Balances'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleAccountViewChange('basic')}
+                >
+                  Basic View
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <Select value={selectedAccount || ''} onValueChange={setSelectedAccount}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an account to analyze" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stats.byAccount.map((account, index) => (
+                      <SelectItem key={index} value={account.account}>{account.account}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setAccountChartType('pie')}
+                    className={accountChartType === 'pie' ? 'bg-primary text-primary-foreground' : ''}
+                  >
+                    <PieChartIcon className="h-4 w-4 mr-1" /> Pie
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setAccountChartType('bar')}
+                    className={accountChartType === 'bar' ? 'bg-primary text-primary-foreground' : ''}
+                  >
+                    <BarChartIcon className="h-4 w-4 mr-1" /> Bar
+                  </Button>
+                </div>
+              </div>
+              
+              {!selectedAccount && (
+                <div className="mt-4 h-[250px]">
+                  {accountChartType === 'pie' ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.byAccount}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="balance"
+                          nameKey="account"
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {stats.byAccount.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats.byAccount}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="account" />
+                        <YAxis tickFormatter={(value) => formatCurrency(Number(value)).split('.')[0]} />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                        <Bar dataKey="balance" fill="#4ade80" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              )}
+              
+              <div className="mt-6 space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="cursor-pointer" onClick={() => handleSort('account')}>
+                        Account {sortConfig.key === 'account' && (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                        )}
+                      </TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => handleSort('balance')}>
+                        Balance {sortConfig.key === 'balance' && (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                        )}
+                      </TableHead>
+                      <TableHead className="cursor-pointer" onClick={() => handleSort('percentage')}>
+                        % of Total {sortConfig.key === 'percentage' && (
+                          sortConfig.direction === 'asc' ? <ChevronUp className="inline h-4 w-4"/> : <ChevronDown className="inline h-4 w-4"/>
+                        )}
+                      </TableHead>
+                      <TableHead>Health</TableHead>
+                      <TableHead>Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedAccounts.map((account, index) => {
+                      const health = getAccountHealthStatus(account);
+                      const analytics = accountAnalytics[account.account];
+                      
+                      return (
+                        <React.Fragment key={index}>
+                          <TableRow className={openAccountId === account.account ? 'bg-accent/50' : ''}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: account.color || COLORS[index % COLORS.length] }}
+                                />
+                                {account.account}
+                              </div>
+                            </TableCell>
+                            <TableCell className={account.balance >= 0 ? "text-income" : "text-expense"}>
+                              {showBalance ? formatCurrency(account.balance) : '•••••••'}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <span>{account.percentage.toFixed(1)}%</span>
+                                <Progress value={account.percentage} className="h-1" />
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {analytics && (
+                                <Badge 
+                                  variant={
+                                    health.status === 'positive' ? 'outline' : 
+                                    health.status === 'negative' ? 'destructive' : 
+                                    health.status === 'warning' ? 'secondary' : 'outline'
+                                  }
+                                  className="flex items-center gap-1"
+                                >
+                                  {analytics.trend === 'up' ? (
+                                    <TrendingUp className="h-3 w-3" />
+                                  ) : analytics.trend === 'down' ? (
+                                    <TrendingDown className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3" />
+                                  )}
+                                  {analytics.changePercentage.toFixed(1)}%
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setOpenAccountId(openAccountId === account.account ? null : account.account)}
+                              >
+                                <CreditCard className="h-4 w-4 mr-1" /> 
+                                {openAccountId === account.account ? 'Hide' : 'View'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          
+                          {openAccountId === account.account && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="p-0">
+                                <div className="p-4 bg-accent/20 space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <Card className="bg-card/60">
+                                      <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-medium">Account Summary</CardTitle>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <dl className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <dt>Current Balance:</dt>
+                                            <dd className={`font-semibold ${account.balance >= 0 ? 'text-income' : 'text-expense'}`}>
+                                              {showBalance ? formatCurrency(account.balance) : '•••••••'}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Status:</dt>
+                                            <dd className="font-semibold">{health.message}</dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Recent Change:</dt>
+                                            <dd className={`font-semibold ${analytics?.trend === 'up' ? 'text-income' : analytics?.trend === 'down' ? 'text-expense' : ''}`}>
+                                              {analytics ? `${analytics.changePercentage.toFixed(1)}%` : 'N/A'}
+                                            </dd>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <dt>Total Transactions:</dt>
+                                            <dd className="font-semibold">
+                                              {transactions.filter(t => t.account === account.account).length}
+                                            </dd>
+                                          </div>
+                                        </dl>
+                                      </CardContent>
+                                    </Card>
+                                    
+                                    <Card className="bg-card/60 md:col-span-2">
+                                      <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                                        <CardTitle className="text-sm font-medium">Balance History</CardTitle>
+                                        <Select value={accountHistoryPeriod} onValueChange={setAccountHistoryPeriod}>
+                                          <SelectTrigger className="w-[100px] h-7">
+                                            <SelectValue placeholder="Period" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="7d">7 Days</SelectItem>
+                                            <SelectItem value="14d">14 Days</SelectItem>
+                                            <SelectItem value="30d">30 Days</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </CardHeader>
+                                      <CardContent className="p-0 h-[150px]">
+                                        {analytics && (
+                                          <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart
+                                              data={getAccountHistoryData(account.account)}
+                                              margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                                            >
+                                              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                              <XAxis 
+                                                dataKey="date" 
+                                                tick={{ fontSize: 10 }}
+                                                tickFormatter={(value) => {
+                                                  const date = new Date(value);
+                                                  return `${date.getMonth()+1}/${date.getDate()}`;
+                                                }}
+                                              />
+                                              <YAxis 
+                                                domain={['dataMin', 'dataMax']}
+                                                tickFormatter={(value) => formatCurrency(value).split('.')[0]}
+                                                tick={{ fontSize: 10 }}
+                                              />
+                                              <Tooltip 
+                                                formatter={(value) => formatCurrency(Number(value))}
+                                                labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                                              />
+                                              <Bar 
+                                                type="monotone" 
+                                                dataKey="balance" 
+                                                fill={account.color || COLORS[index % COLORS.length]} 
+                                                stroke={account.color || COLORS[index % COLORS.length]}
+                                              />
+                                            </LineChart>
+                                          </ResponsiveContainer>
+                                        )}
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                  
+                                  <div className="mt-4">
+                                    <h4 className="font-medium mb-2 flex items-center">
+                                      <History className="h-4 w-4 mr-1" /> Recent Activity
+                                    </h4>
+                                    {analytics && analytics.recentActivity.length > 0 ? (
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Amount</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {analytics.recentActivity.map((activity, idx) => (
+                                            <TableRow key={idx}>
+                                              <TableCell className="text-xs">
+                                                {new Date(activity.date).toLocaleDateString()}
+                                              </TableCell>
+                                              <TableCell>{activity.description || 'Transaction'}</TableCell>
+                                              <TableCell>
+                                                <Badge variant={activity.type === 'Income' ? 'outline' : 'secondary'} className={`${activity.type === 'Income' ? 'border-income/50 bg-income/10 text-income' : 'border-expense/50 bg-expense/10 text-expense'}`}>
+                                                  {activity.type}
+                                                </Badge>
+                                              </TableCell>
+                                              <TableCell className={`text-right ${activity.type === 'Income' ? 'text-income' : 'text-expense'}`}>
+                                                {formatCurrency(activity.amount)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    ) : (
+                                      <div className="text-center text-muted-foreground p-4">
+                                        No recent activity for this account
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {transactions.filter(t => t.account === account.account).length > 5 && (
+                                    <div className="flex justify-center mt-2">
+                                      <Button variant="outline" size="sm" onClick={() => setSelectedAccount(account.account)}>
+                                        View All Transactions
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                
+                {selectedAccount && (
+                  <div className="mt-6 border-t pt-4">
+                    <h3 className="font-medium text-lg mb-4 flex items-center">
+                      <Banknote className="h-5 w-5 mr-2" /> 
+                      Transactions for {selectedAccount}
+                    </h3>
+                    {accountTransactions.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Type</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {accountTransactions
+                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                            .slice(0, 10)
+                            .map((transaction, index) => (
+                              <TableRow key={index}>
+                                <TableCell>{new Date(transaction.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{transaction.description}</TableCell>
+                                <TableCell>{transaction.category}</TableCell>
+                                <TableCell className={transaction.type === 'Income' ? "text-income" : "text-expense"}>
+                                  {formatCurrency(transaction.amount)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={transaction.type === 'Income' ? 'outline' : 'secondary'} className={`${transaction.type === 'Income' ? 'border-income/50 bg-income/10 text-income' : 'border-expense/50 bg-expense/10 text-expense'}`}>
+                                    {transaction.type}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="flex items-center justify-center p-8 border rounded-md bg-muted/20">
+                        <AlertCircle className="h-5 w-5 mr-2 text-muted-foreground" />
+                        <p className="text-muted-foreground">No transactions found for this account</p>
+                      </div>
+                    )}
+                    {accountTransactions.length > 10 && (
+                      <div className="flex justify-center mt-4">
+                        <Button variant="outline" size="sm">
+                          View All {accountTransactions.length} Transactions
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-10 animate-in">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-2xl font-bold mb-2 sm:mb-0">Financial Reports</h1>
+        
+        <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
+          <Button variant="outline" onClick={handleExport} size="sm">
+            <Download className="h-4 w-4 mr-1" /> Export
           </Button>
-          <Button variant="outline" onClick={exportReport} className="flex gap-2 items-center text-xs sm:text-sm">
-            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Export</span>
+          
+          <Button onClick={() => {
+            refreshData();
+            toast({ title: "Report Refreshed", description: "Data has been updated" });
+          }} size="sm">
+            Refresh Data
           </Button>
         </div>
       </div>
       
-      <Card className="mb-4 sm:mb-6 overflow-hidden">
-        <CardHeader className="pb-2 sm:pb-3">
-          <CardTitle className="text-base sm:text-lg">Filter Options</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Customize your report view</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="date-range" className="text-xs sm:text-sm">Date Range</Label>
-              <DateRangePicker 
-                dateRange={dateRange}
-                onDateRangeChange={setDateRange}
-              />
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Report Type</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={reportType} onValueChange={setReportType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select report type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Transactions</SelectItem>
+                <SelectItem value="expenses">Expenses Only</SelectItem>
+                <SelectItem value="income">Income Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Time Range</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select time range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="quarter">Last Quarter</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
             
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="category" className="text-xs sm:text-sm">Category</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger id="category" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map(category => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="account" className="text-xs sm:text-sm">Account</Label>
-              <Select value={accountFilter} onValueChange={setAccountFilter}>
-                <SelectTrigger id="account" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Accounts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Accounts</SelectItem>
-                  {uniqueAccounts.map(account => (
-                    <SelectItem key={account} value={account}>{account}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="type" className="text-xs sm:text-sm">Transaction Type</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger id="type" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Income">Income</SelectItem>
-                  <SelectItem value="Expense">Expense</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="search" className="text-xs sm:text-sm">Search Transactions</Label>
-              <Input 
-                id="search" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search by description, category, etc."
-                className="text-xs sm:text-sm"
-              />
-            </div>
-            
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="timeframe" className="text-xs sm:text-sm">Time Grouping</Label>
-              <Select 
-                value={timeframe} 
-                onValueChange={(value) => setTimeframe(value as 'daily' | 'weekly' | 'monthly')}
-              >
-                <SelectTrigger id="timeframe" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="Select timeframe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="sort" className="text-xs sm:text-sm">Sort Order</Label>
+            {timeRange === 'custom' && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <Select value={startYear} onValueChange={setStartYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Start Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map(year => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Select value={endYear} onValueChange={setEndYear}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="End Year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map(year => (
+                        <SelectItem key={year} value={year}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Category</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category, index) => (
+                  <SelectItem key={index} value={category}>{category}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">View As</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex space-x-2">
               <Button 
-                variant="outline" 
-                className="w-full justify-between text-xs sm:text-sm"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                variant={viewMode === 'chart' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('chart')}
+                className="flex-1"
               >
-                Date {sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}
-                <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                <BarChartIcon className="h-4 w-4 mr-1" /> Chart
+              </Button>
+              <Button 
+                variant={viewMode === 'table' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setViewMode('table')}
+                className="flex-1"
+              >
+                <FileType className="h-4 w-4 mr-1" /> Table
               </Button>
             </div>
-          </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">
+            {reportType === 'all' ? 'All Transactions' : 
+              reportType === 'expenses' ? 'Expense Report' : 'Income Report'} - {
+                timeRange === 'month' ? 'Last Month' : 
+                timeRange === 'quarter' ? 'Last Quarter' : 
+                timeRange === 'year' ? 'Last Year' :
+                timeRange === 'custom' ? `${startYear} - ${endYear}` :
+                'All Time'
+              }
+          </CardTitle>
+          <CardDescription>
+            {categoryFilter !== 'all' ? `Filtered by category: ${categoryFilter}` : 'All categories'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : renderActiveChart()}
         </CardContent>
       </Card>
       
-      {filteredTransactions.length === 0 ? (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground text-sm sm:text-base">No transactions found matching the current filters.</p>
+          <CardHeader>
+            <CardTitle className="text-lg">Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="space-y-2">
+              <div className="flex justify-between">
+                <dt>Total Records:</dt>
+                <dd className="font-semibold">{reportData.length}</dd>
+              </div>
+              
+              <div className="flex justify-between">
+                <dt>Total Income:</dt>
+                <dd className="font-semibold text-income">
+                  {formatCurrency(reportData.reduce((sum, item) => sum + (item.income || 0), 0))}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Total Expenses:</dt>
+                <dd className="font-semibold text-expense">
+                  {formatCurrency(reportData.reduce((sum, item) => sum + (item.expense || 0), 0))}
+                </dd>
+              </div>
+              <div className="flex justify-between border-t pt-2 mt-2">
+                <dt>Net:</dt>
+                <dd className={`font-bold ${reportData.reduce((sum, item) => sum + ((item.income || 0) - (item.expense || 0)), 0) >= 0 ? 'text-income' : 'text-expense'}`}>
+                  {formatCurrency(reportData.reduce((sum, item) => sum + ((item.income || 0) - (item.expense || 0)), 0))}
+                </dd>
+              </div>
+            </dl>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/50">
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">Total Income</p>
-                    <h3 className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-300">{formatCurrency(totalIncome)}</h3>
-                  </div>
-                  <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                    <TrendingUp className="h-4 w-4 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/50">
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">Total Expenses</p>
-                    <h3 className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-300">{formatCurrency(totalExpense)}</h3>
-                  </div>
-                  <div className="p-2 sm:p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <BarChart2 className="h-4 w-4 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className={cn(
-              "border",
-              netBalance >= 0 
-                ? "bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/50" 
-                : "bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50"
-            )}>
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className={cn(
-                      "text-xs sm:text-sm font-medium",
-                      netBalance >= 0 
-                        ? "text-blue-600 dark:text-blue-400" 
-                        : "text-amber-600 dark:text-amber-400"
-                    )}>Net Balance</p>
-                    <h3 className={cn(
-                      "text-lg sm:text-2xl font-bold",
-                      netBalance >= 0 
-                        ? "text-blue-700 dark:text-blue-300" 
-                        : "text-amber-700 dark:text-amber-300"
-                    )}>{formatCurrency(netBalance)}</h3>
-                  </div>
-                  <div className={cn(
-                    "p-2 sm:p-3 rounded-full",
-                    netBalance >= 0 
-                      ? "bg-blue-100 dark:bg-blue-900/30" 
-                      : "bg-amber-100 dark:bg-amber-900/30"
-                  )}>
-                    <PieChartIcon className={cn(
-                      "h-4 w-4 sm:h-6 sm:w-6",
-                      netBalance >= 0 
-                        ? "text-blue-600 dark:text-blue-400" 
-                        : "text-amber-600 dark:text-amber-400"
-                    )} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Tabs defaultValue="overview" value={activeTab} onValueChange={(value) => setActiveTab(value as 'overview' | 'advanced')}>
-            <TabsList className="grid grid-cols-2 mb-4 sm:mb-6">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="advanced" className="text-xs sm:text-sm">Advanced Analysis</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Spending by Category</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Distribution of expenses across categories</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {categoryData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={categoryData}
-                              dataKey="value"
-                              cx="50%"
-                              cy="50%"
-                              labelLine
-                              label={renderCustomizedLabel}
-                              outerRadius={window.innerWidth < 640 ? 70 : 100}
-                              fill="#8884d8"
-                            >
-                              {categoryData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend layout={window.innerWidth < 640 ? "horizontal" : "vertical"} verticalAlign="bottom" align="center" />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No category data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Cash Flow Over Time</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Income vs expenses over the selected period</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {timeframeData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={timeframeData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="time" tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Bar dataKey="income" name="Income" fill="#4BC0C0" />
-                            <Bar dataKey="expense" name="Expense" fill="#FF6384" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No time-based data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="lg:col-span-2">
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Balance Trend</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">How your balance changed over time</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {timeframeData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={timeframeData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="time" tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Line type="monotone" dataKey="balance" name="Balance" stroke="#8884d8" activeDot={{ r: 8 }} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No balance trend data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="advanced" className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Account Distribution</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">How your money is distributed among accounts</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {accountData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={accountData}
-                              dataKey="value"
-                              cx="50%"
-                              cy="50%"
-                              labelLine
-                              label={renderCustomizedLabel}
-                              outerRadius={window.innerWidth < 640 ? 70 : 100}
-                              fill="#8884d8"
-                            >
-                              {accountData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend layout={window.innerWidth < 640 ? "horizontal" : "vertical"} verticalAlign="bottom" align="center" />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No account data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Income vs Expense</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Compare income and expenses</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {filteredTransactions.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={[
-                              { name: 'Income', amount: totalIncome, fill: '#4BC0C0' },
-                              { name: 'Expenses', amount: totalExpense, fill: '#FF6384' },
-                            ]}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Bar dataKey="amount" name="Amount">
-                              {[
-                                { name: 'Income', amount: totalIncome, fill: '#4BC0C0' },
-                                { name: 'Expenses', amount: totalExpense, fill: '#FF6384' },
-                              ].map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="lg:col-span-2">
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Transaction Statistics</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Key metrics about your transactions</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Total Transactions</p>
-                        <h4 className="text-base sm:text-2xl font-bold">{filteredTransactions.length}</h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Avg. Transaction</p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(
-                            filteredTransactions.length 
-                              ? filteredTransactions.reduce((sum, t) => sum + t.amount, 0) / filteredTransactions.length 
-                              : 0
-                          )}
-                        </h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Largest Expense</p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(Math.max(...filteredTransactions
-                            .filter(t => t.type === 'Expense')
-                            .map(t => t.amount), 0)
-                          )}
-                        </h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Largest Income</p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(Math.max(...filteredTransactions
-                            .filter(t => t.type === 'Income')
-                            .map(t => t.amount), 0)
-                          )}
-                        </h4>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
+        
+        {renderAccountsView()}
+      </div>
     </div>
   );
 };
-
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ');
-}
 
 export default Reports;

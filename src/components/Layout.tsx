@@ -21,8 +21,7 @@ import {
   Moon,
   Sun,
   Laptop,
-  HelpCircle,
-  Tag
+  HelpCircle
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/components/ui/use-toast';
@@ -44,15 +43,15 @@ const SidebarItem = ({ icon, label, to, isActive, count, isCollapsed }: SidebarI
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link to={to} className="block w-full">
+          <Link to={to}>
             <Button 
               variant="ghost" 
               className={cn(
-                "w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal relative transition-all duration-200 hover:bg-primary/10 text-sm",
+                "w-full justify-start gap-3 p-3 font-normal relative transition-all duration-200 hover:bg-primary/10",
                 isActive ? "bg-primary/15 text-primary" : "hover:bg-accent/50"
               )}
             >
-              <div className={cn("flex items-center gap-2 sm:gap-3", isCollapsed && "justify-center w-full")}>
+              <div className={cn("flex items-center gap-3", isCollapsed && "justify-center w-full")}>
                 {icon}
                 {!isCollapsed && <span>{label}</span>}
                 {!isCollapsed && count !== undefined && (
@@ -80,33 +79,28 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
   const navigationItems = [
     {
-      icon: <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <LayoutDashboard className="h-5 w-5" />,
       label: "Dashboard",
       to: "/",
     },
     {
-      icon: <ListFilter className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <ListFilter className="h-5 w-5" />,
       label: "Transactions",
       to: "/transactions",
       count: 12,
     },
     {
-      icon: <PieChart className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <PieChart className="h-5 w-5" />,
       label: "Budget",
       to: "/budget",
     },
     {
-      icon: <LineChart className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <LineChart className="h-5 w-5" />,
       label: "Reports",
       to: "/reports",
     },
     {
-      icon: <Tag className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Categories",
-      to: "/categories",
-    },
-    {
-      icon: <Upload className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <Upload className="h-5 w-5" />,
       label: "Import",
       to: "/import",
     },
@@ -114,12 +108,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const bottomItems = [
     {
-      icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <User className="h-5 w-5" />,
       label: "Profile",
       to: "/profile",
     },
     {
-      icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" />,
+      icon: <Settings className="h-5 w-5" />,
       label: "Settings",
       to: "/settings",
     },
@@ -148,88 +142,79 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     localStorage.setItem('sidebarCollapsed', String(!isCollapsed));
   };
 
+  // Load sidebar state from localStorage
   useEffect(() => {
     const savedState = localStorage.getItem('sidebarCollapsed');
     if (savedState !== null) {
       setIsCollapsed(savedState === 'true');
     }
     
-    // Close mobile menu when route changes
+    // Close mobile menu when location changes
     setIsMobileMenuOpen(false);
-    
-    // Auto-collapse sidebar on small screens
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsCollapsed(true);
-      }
-    };
-    
-    handleResize(); // Run once on initial load
-    window.addEventListener('resize', handleResize);
-    
-    return () => window.removeEventListener('resize', handleResize);
   }, [location.pathname]);
 
+  // Theme switcher component for mobile dropdown
   const MobileThemeSwitcher = () => (
     <>
-      <DropdownMenuItem disabled className="opacity-70 text-xs sm:text-sm">
+      <DropdownMenuItem disabled className="opacity-70">
         Theme
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
-        <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        Light {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+      <DropdownMenuItem onClick={() => setThemeMode("light")}>
+        <Sun className="mr-2 h-4 w-4" />
+        Light {themeMode === "light" && <Check className="ml-auto h-4 w-4" />}
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
-        <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        Dark {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+      <DropdownMenuItem onClick={() => setThemeMode("dark")}>
+        <Moon className="mr-2 h-4 w-4" />
+        Dark {themeMode === "dark" && <Check className="ml-auto h-4 w-4" />}
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
-        <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        System {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+      <DropdownMenuItem onClick={() => setThemeMode("system")}>
+        <Laptop className="mr-2 h-4 w-4" />
+        System {themeMode === "system" && <Check className="ml-auto h-4 w-4" />}
       </DropdownMenuItem>
     </>
   );
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Mobile Header */}
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
         <div className="container flex h-14 items-center">
           <div className="flex justify-between items-center w-full">
             <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              <h1 className="font-semibold text-sm">Finance Tracker</h1>
+              <CreditCard className="h-6 w-6 text-primary" />
+              <h1 className="font-semibold">Finance Tracker</h1>
             </div>
             
             <div className="flex items-center gap-2">
               {user && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full h-8 w-8" aria-label="User menu">
+                    <Button variant="ghost" size="icon" className="rounded-full" aria-label="User menu">
                       <UserCircle className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 sm:w-56">
+                  <DropdownMenuContent align="end" className="w-56">
                     <div className="flex items-center justify-start gap-2 p-2">
                       <div className="rounded-full bg-primary/10 p-1">
-                        <UserCircle className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                        <UserCircle className="h-8 w-8 text-primary" />
                       </div>
                       <div className="flex flex-col space-y-0.5">
-                        <p className="text-xs sm:text-sm font-medium">{user.email}</p>
+                        <p className="text-sm font-medium">{user.email}</p>
                         <p className="text-xs text-muted-foreground">User Account</p>
                       </div>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/profile')} className="text-xs sm:text-sm">
-                      <User className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                      <User className="mr-2 h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate('/settings')} className="text-xs sm:text-sm">
-                      <Settings className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-xs sm:text-sm">
-                      <LogOut className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
                       <span>Logout</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -242,7 +227,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="h-8 w-8"
                 aria-label="Toggle Menu"
               >
                 {isMobileMenuOpen ? (
@@ -256,9 +240,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </header>
       
+      {/* Mobile Navigation Drawer */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-30 bg-background/95 backdrop-blur-sm md:hidden animate-in overflow-auto">
-          <div className="container pt-16 pb-8">
+        <div className="fixed inset-0 z-30 bg-background/95 backdrop-blur-sm md:hidden animate-in">
+          <div className="container pt-20 pb-8">
             <nav className="flex flex-col gap-1">
               {navigationItems.map((item, index) => (
                 <SidebarItem 
@@ -287,10 +272,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <>
                   <Button 
                     variant="ghost" 
-                    className="w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal mt-4 border-t pt-4 text-sm"
+                    className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
                     onClick={handleLogout}
                   >
-                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <LogOut className="h-5 w-5" />
                     <span>Logout</span>
                   </Button>
                 </>
@@ -298,76 +283,44 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Link to="/auth">
                   <Button 
                     variant="ghost" 
-                    className="w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal mt-4 border-t pt-4 text-sm"
+                    className="w-full justify-start gap-3 p-3 font-normal mt-4 border-t pt-4"
                   >
-                    <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <UserCircle className="h-5 w-5" />
                     <span>Login / Sign Up</span>
                   </Button>
                 </Link>
               )}
-              
-              <div className="mt-6 p-2 bg-accent/50 rounded-lg">
-                <p className="text-xs font-medium mb-2">Theme</p>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className={cn("flex-1 h-8 text-xs", themeMode === "light" && "bg-accent text-accent-foreground")}
-                    onClick={() => setThemeMode("light")}
-                  >
-                    <Sun className="h-3 w-3 mr-1" />
-                    Light
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className={cn("flex-1 h-8 text-xs", themeMode === "dark" && "bg-accent text-accent-foreground")}
-                    onClick={() => setThemeMode("dark")}
-                  >
-                    <Moon className="h-3 w-3 mr-1" />
-                    Dark
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className={cn("flex-1 h-8 text-xs", themeMode === "system" && "bg-accent text-accent-foreground")}
-                    onClick={() => setThemeMode("system")}
-                  >
-                    <Laptop className="h-3 w-3 mr-1" />
-                    System
-                  </Button>
-                </div>
-              </div>
             </nav>
           </div>
         </div>
       )}
       
-      <div className="flex-1 flex md:container-full md:pt-4">
+      <div className="flex-1 flex md:container md:pt-4">
+        {/* Desktop Sidebar */}
         <aside className={cn(
-          "hidden md:flex flex-col gap-4 sm:gap-6 border-r pt-4 transition-all duration-300 ease-in-out",
-          isCollapsed ? "w-[60px]" : "w-64"
+          "hidden md:flex flex-col gap-6 border-r pt-4 transition-all duration-300 ease-in-out",
+          isCollapsed ? "w-[70px]" : "w-64"
         )}>
           <div className={cn(
-            "flex items-center gap-2 px-2 sm:px-4", 
+            "flex items-center gap-2 px-4", 
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {!isCollapsed && (
               <>
                 <div className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <h1 className="font-semibold text-base sm:text-lg">Finance App</h1>
+                  <CreditCard className="h-6 w-6 text-primary" />
+                  <h1 className="font-semibold text-lg">Finance App</h1>
                 </div>
               </>
             )}
-            {isCollapsed && <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />}
+            {isCollapsed && <CreditCard className="h-6 w-6 text-primary" />}
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={toggleSidebar} 
-              className={cn("ml-auto hover:bg-primary/10 h-7 w-7 sm:h-8 sm:w-8", isCollapsed && "ml-0")}
+              className={cn("ml-auto hover:bg-primary/10", isCollapsed && "ml-0")}
             >
-              <ChevronRight className={cn("h-4 w-4 sm:h-5 sm:w-5 transition-transform", isCollapsed && "rotate-180")} />
+              <ChevronRight className={cn("h-5 w-5 transition-transform", isCollapsed && "rotate-180")} />
             </Button>
           </div>
           
@@ -401,12 +354,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <Button 
                 variant="ghost" 
                 className={cn(
-                  "justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal mt-1 hover:bg-primary/10 text-sm",
+                  "justify-start gap-3 p-3 font-normal mt-1 hover:bg-primary/10",
                   isCollapsed && "justify-center"
                 )}
                 onClick={handleLogout}
               >
-                <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                <LogOut className="h-5 w-5" />
                 {!isCollapsed && <span>Logout</span>}
               </Button>
             ) : (
@@ -414,43 +367,44 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Button 
                   variant="ghost" 
                   className={cn(
-                    "w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal hover:bg-primary/10 text-sm",
+                    "w-full justify-start gap-3 p-3 font-normal hover:bg-primary/10",
                     isCollapsed && "justify-center"
                   )}
                 >
-                  <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <UserCircle className="h-5 w-5" />
                   {!isCollapsed && <span>Login</span>}
                 </Button>
               </Link>
             )}
             
+            {/* Desktop Theme Switcher */}
             {!isCollapsed && (
               <div className="border-t mt-4 pt-4 px-2">
-                <p className="mb-2 text-xs sm:text-sm font-medium">Theme</p>
+                <p className="mb-2 text-sm font-medium">Theme</p>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "light" && "bg-accent text-accent-foreground")}
+                    className={cn("flex items-center gap-1", themeMode === "light" && "bg-accent text-accent-foreground")}
                     onClick={() => setThemeMode("light")}
                   >
-                    <Sun className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <Sun className="h-3.5 w-3.5" />
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "dark" && "bg-accent text-accent-foreground")}
+                    className={cn("flex items-center gap-1", themeMode === "dark" && "bg-accent text-accent-foreground")}
                     onClick={() => setThemeMode("dark")}
                   >
-                    <Moon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <Moon className="h-3.5 w-3.5" />
                   </Button>
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "system" && "bg-accent text-accent-foreground")}
+                    className={cn("flex items-center gap-1", themeMode === "system" && "bg-accent text-accent-foreground")}
                     onClick={() => setThemeMode("system")}
                   >
-                    <Laptop className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <Laptop className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -462,32 +416,32 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="w-full justify-center p-2 sm:p-3 mt-4 h-8 w-8 sm:h-10 sm:w-10"
+                    className="w-full justify-center p-3 mt-4"
                   >
                     {themeMode === 'light' ? (
-                      <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <Sun className="h-5 w-5" />
                     ) : themeMode === 'dark' ? (
-                      <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <Moon className="h-5 w-5" />
                     ) : (
-                      <Laptop className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <Laptop className="h-5 w-5" />
                     )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right">
-                  <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
-                    <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  <DropdownMenuItem onClick={() => setThemeMode("light")}>
+                    <Sun className="mr-2 h-4 w-4" />
                     <span>Light</span>
-                    {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                    {themeMode === "light" && <Check className="ml-auto h-4 w-4" />}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
-                    <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  <DropdownMenuItem onClick={() => setThemeMode("dark")}>
+                    <Moon className="mr-2 h-4 w-4" />
                     <span>Dark</span>
-                    {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                    {themeMode === "dark" && <Check className="ml-auto h-4 w-4" />}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
-                    <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                  <DropdownMenuItem onClick={() => setThemeMode("system")}>
+                    <Laptop className="mr-2 h-4 w-4" />
                     <span>System</span>
-                    {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                    {themeMode === "system" && <Check className="ml-auto h-4 w-4" />}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -497,8 +451,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="opacity-60 hover:opacity-100 h-7 w-7 sm:h-8 sm:w-8">
-                      <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Button variant="ghost" size="icon" className="opacity-60 hover:opacity-100">
+                      <HelpCircle className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>Help & Support</TooltipContent>
@@ -508,8 +462,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </div>
         </aside>
         
+        {/* Main Content */}
         <main className={cn(
-          "flex-1 pt-4 px-2 sm:pt-6 sm:px-4 md:pt-0 md:pl-6 sm:pb-12 overflow-auto",
+          "flex-1 pt-6 px-4 md:pt-0 md:pl-8 pb-12 overflow-auto",
           isCollapsed && "md:pl-4"
         )}>
           <div className="max-w-6xl mx-auto">
