@@ -1,4 +1,3 @@
-
 // Transaction type definitions
 export interface Transaction {
   id: string;
@@ -9,35 +8,34 @@ export interface Transaction {
   description: string;
   category: string;
   account: string;
-  payment_type?: 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'CASH';
   payee?: string;
   notes?: string;
-  note?: string; // Adding for backward compatibility
   recurring?: boolean;
   interval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
   tags?: string[];
   attachments?: string[];
-  merchant?: string; // Added missing merchant property
   createdAt?: any;
   updatedAt?: any;
 }
+
 // Budget definitions
 export interface Budget {
   id: string;
   category: string;
-  name?: string; // Adding name property for budget
   amount: number;
   period: 'weekly' | 'monthly' | 'yearly';
   createdAt?: any;
   updatedAt?: any;
   color?: string;
 }
+
 export interface BudgetSummary {
   budget: Budget;
   spent: number;
   remaining: number;
   percentage: number;
 }
+
 // Dashboard/Stats definitions
 export interface CategorySummary {
   category: string;
@@ -45,13 +43,14 @@ export interface CategorySummary {
   percentage: number;
   color: string;
 }
+
 export interface AccountSummary {
   account: string;
   balance: number;
   percentage: number;
   color: string;
-  total?: number; // Adding for compatibility with AccountsOverview
 }
+
 export interface MonthlyData {
   month: string;
   income: number;
@@ -59,6 +58,7 @@ export interface MonthlyData {
   balance: number;
   categories?: CategorySummary[];
 }
+
 export interface DashboardStats {
   totalIncome: number;
   totalExpense: number;
@@ -68,6 +68,7 @@ export interface DashboardStats {
   byMonth: MonthlyData[];
   recentTransactions: Transaction[];
 }
+
 // Firebase types
 export interface FirebaseConfig {
   apiKey: string;
@@ -77,6 +78,7 @@ export interface FirebaseConfig {
   messagingSenderId: string;
   appId: string;
 }
+
 // User settings
 export interface UserSettings {
   themeMode: 'light' | 'dark' | 'system';
@@ -87,7 +89,9 @@ export interface UserSettings {
   defaultCategory: string;
   firebaseConfig?: FirebaseConfig;
 }
+
 // Export format types
 export type ExportFormat = 'csv' | 'json' | 'xlsx';
+
 // Import format types
 export type ImportFormat = 'csv' | 'xls' | 'xlsx' | 'json';

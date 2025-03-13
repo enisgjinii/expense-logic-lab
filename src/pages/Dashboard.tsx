@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { formatCurrency } from '@/utils/finance-utils';
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 
+// Define the dashboard panel interface
 interface DashboardPanel {
   id: string;
   title: string;
@@ -29,11 +31,12 @@ interface DashboardPanel {
 
 const Dashboard = () => {
   const { stats, refreshData } = useFinance();
-  const [timeRange, setTimeRange] = useState('month');
+  const [timeRange, setTimeRange] = useState('month'); // month, quarter, year
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
-
+  
+  // Dashboard layout state
   const [panels, setPanels] = useState<DashboardPanel[]>(() => {
     const savedLayout = localStorage.getItem('dashboardLayout');
     if (savedLayout) {
@@ -44,6 +47,7 @@ const Dashboard = () => {
       }
     }
     
+    // Default layout
     return [
       { id: 'stats', title: 'Key Statistics', component: 'statistics', size: 'full' },
       { id: 'monthly', title: 'Monthly Overview', component: 'monthlyChart', size: 'medium' },
@@ -53,10 +57,12 @@ const Dashboard = () => {
     ];
   });
 
+  // Save layout when it changes
   useEffect(() => {
     localStorage.setItem('dashboardLayout', JSON.stringify(panels));
   }, [panels]);
 
+  // Simulate data refresh
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshData();
@@ -66,10 +72,11 @@ const Dashboard = () => {
     }, 800);
   };
 
+  // Auto-refresh effect
   useEffect(() => {
     const interval = setInterval(() => {
       refreshData();
-    }, 300000);
+    }, 300000); // Refresh every 5 minutes
     return () => clearInterval(interval);
   }, [refreshData]);
 
@@ -84,6 +91,7 @@ const Dashboard = () => {
     );
   }
 
+  // Handle drag and drop
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
 
@@ -95,6 +103,7 @@ const Dashboard = () => {
     toast({ title: "Layout Updated", description: "Dashboard layout has been saved" });
   };
 
+  // Calculate trend values more dynamically
   const incomeChange = stats.byMonth.length > 1 
     ? ((stats.byMonth[stats.byMonth.length - 1].income - stats.byMonth[stats.byMonth.length - 2].income) / 
        (stats.byMonth[stats.byMonth.length - 2].income || 1)) * 100 
@@ -105,6 +114,7 @@ const Dashboard = () => {
        (stats.byMonth[stats.byMonth.length - 2].expense || 1)) * 100 
     : 0;
 
+  // Filter data based on timeRange
   const getFilteredData = () => {
     switch(timeRange) {
       case 'quarter':
@@ -116,11 +126,15 @@ const Dashboard = () => {
     }
   };
 
+  // Get insights based on current data
   const getInsights = () => {
+    // Find highest expense category
     const highestExpenseCategory = [...stats.byCategory].sort((a, b) => b.total - a.total)[0];
     
+    // Calculate growth for each category
     const growingExpenses = stats.byMonth.length > 2 
       ? stats.byCategory.map(cat => {
+          // Find this category in the previous month data
           const prevMonthCategories = stats.byMonth[stats.byMonth.length - 2].categories || [];
           const prevCategory = prevMonthCategories.find(c => c.category === cat.category);
           const prevAmount = prevCategory ? prevCategory.total : 0;
@@ -142,6 +156,7 @@ const Dashboard = () => {
 
   const insights = getInsights();
 
+  // Render dashboard components based on panel type
   const renderPanelContent = (panel: DashboardPanel) => {
     switch(panel.component) {
       case 'statistics':
@@ -152,8 +167,9 @@ const Dashboard = () => {
               value={formatCurrency(stats.totalIncome)}
               icon={<ArrowUpRight className="h-5 w-5 text-emerald-500" />}
               trend={{
-                value: Number(incomeChange.toFixed(1)),
-                label: 'since last month'
+                value: incomeChange.toFixed(1),
+                label: 'since last month',
+                isPositive: incomeChange >= 0
               }}
               className="sm:col-span-1"
             />
@@ -162,8 +178,9 @@ const Dashboard = () => {
               value={formatCurrency(stats.totalExpense)}
               icon={<ArrowDownRight className="h-5 w-5 text-rose-500" />}
               trend={{
-                value: Number(expenseChange.toFixed(1)),
-                label: 'since last month'
+                value: expenseChange.toFixed(1),
+                label: 'since last month',
+                isPositive: expenseChange <= 0
               }}
               className="sm:col-span-1"
             />
@@ -172,8 +189,9 @@ const Dashboard = () => {
               value={formatCurrency(stats.balance)}
               icon={<WalletCards className="h-5 w-5 text-blue-500" />}
               trend={{
-                value: Number(insights.savingsRate.toFixed(1)),
-                label: 'savings rate'
+                value: insights.savingsRate.toFixed(1),
+                label: 'savings rate',
+                isPositive: true
               }}
               className="sm:col-span-1"
             />
@@ -243,6 +261,7 @@ const Dashboard = () => {
     }
   };
 
+  // Render panel based on size
   const getPanelClasses = (size: string) => {
     switch(size) {
       case 'small': return 'col-span-12 md:col-span-4';
@@ -255,6 +274,7 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6 pb-10 animate-in">
+      {/* Dashboard Header with Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-2xl font-bold mb-2 sm:mb-0">Financial Dashboard</h1>
         
@@ -292,6 +312,7 @@ const Dashboard = () => {
         </div>
       </div>
       
+      {/* Tab Navigation */}
       <div className="border-b mb-6">
         <div className="flex space-x-6">
           <button
@@ -332,22 +353,26 @@ const Dashboard = () => {
 
       {activeTab === 'overview' && (
         <>
-          <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6 animate-pulse">
-            <div className="flex items-start">
-              <div className="flex-shrink-0 pt-0.5">
-                <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-amber-800">Spending Alert</h3>
-                <div className="mt-1 text-sm text-amber-700">
-                  Your spending on <strong>{insights.growingExpense?.category}</strong> has increased by {insights.growingExpense?.growth.toFixed(1)}% compared to last month.
+          {/* Financial Insights Banner */}
+          {insights.growingExpense && insights.growingExpense.growth > 10 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6 animate-pulse">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <svg className="h-5 w-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-amber-800">Spending Alert</h3>
+                  <div className="mt-1 text-sm text-amber-700">
+                    Your spending on <strong>{insights.growingExpense.category}</strong> has increased by {insights.growingExpense.growth.toFixed(1)}% compared to last month.
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
           
+          {/* Draggable Dashboard Panels */}
           <DragDropContext onDragEnd={handleDragEnd}>
             <Droppable droppableId="dashboard-panels" direction="vertical">
               {(provided) => (
