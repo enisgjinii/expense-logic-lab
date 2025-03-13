@@ -1,52 +1,22 @@
-// Transaction type definitions
+
+export type TransactionType = 'Income' | 'Expense';
+
+export type PaymentType = 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD' | 'CASH';
+
 export interface Transaction {
   id: string;
-  type: 'Income' | 'Expense' | 'Transfer';
-  amount: number;
-  currency: string;
-  date: string;
-  description: string;
-  category: string;
   account: string;
-  payee?: string;
-  notes?: string;
-  recurring?: boolean;
-  interval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  tags?: string[];
-  attachments?: string[];
-  createdAt?: any;
-  updatedAt?: any;
-}
-
-// Budget definitions
-export interface Budget {
-  id: string;
   category: string;
   amount: number;
-  period: 'weekly' | 'monthly' | 'yearly';
-  createdAt?: any;
-  updatedAt?: any;
-  color?: string;
+  type: TransactionType;
+  payment_type: PaymentType;
+  note: string;
+  date: string;
 }
 
-export interface BudgetSummary {
-  budget: Budget;
-  spent: number;
-  remaining: number;
-  percentage: number;
-}
-
-// Dashboard/Stats definitions
 export interface CategorySummary {
   category: string;
   total: number;
-  percentage: number;
-  color: string;
-}
-
-export interface AccountSummary {
-  account: string;
-  balance: number;
   percentage: number;
   color: string;
 }
@@ -55,8 +25,12 @@ export interface MonthlyData {
   month: string;
   income: number;
   expense: number;
-  balance: number;
-  categories?: CategorySummary[];
+}
+
+export interface AccountSummary {
+  account: string;
+  total: number;
+  percentage: number;
 }
 
 export interface DashboardStats {
@@ -69,29 +43,24 @@ export interface DashboardStats {
   recentTransactions: Transaction[];
 }
 
-// Firebase types
-export interface FirebaseConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
+export interface Budget {
+  id: string;
+  category: string;
+  amount: number;
+  period: 'monthly' | 'weekly' | 'yearly';
+  createdAt: string;
 }
 
-// User settings
-export interface UserSettings {
-  themeMode: 'light' | 'dark' | 'system';
-  currency: string;
-  language: string;
-  dateFormat: string;
-  defaultAccount: string;
-  defaultCategory: string;
-  firebaseConfig?: FirebaseConfig;
+export interface BudgetSummary {
+  budget: Budget;
+  spent: number;
+  remaining: number;
+  percentage: number;
 }
 
-// Export format types
-export type ExportFormat = 'csv' | 'json' | 'xlsx';
-
-// Import format types
-export type ImportFormat = 'csv' | 'xls' | 'xlsx' | 'json';
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}

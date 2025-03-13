@@ -102,10 +102,6 @@
     @apply border-border;
   }
 
-  html, body {
-    font-family: 'Poppins', sans-serif;
-  }
-
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
