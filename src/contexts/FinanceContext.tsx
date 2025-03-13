@@ -69,7 +69,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     addBudget,
     updateBudget,
     deleteBudget,
-  } = useBudgetManager(user);
+  } = useBudgetManager(user, transactions); // Adding transactions as the second parameter
   
   const {
     themeMode,
