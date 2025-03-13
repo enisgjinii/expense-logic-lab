@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tag, Plus, Save, Trash2, Edit, X, Check, Wallet, ChevronRight, Tag as TagIcon, CreditCard, Filter } from 'lucide-react';
+import { Tag, Plus, Save, Trash2, Edit, X, Check, Wallet, ChevronRight, Tag as TagIcon, CreditCard, Filter, Loader2 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -29,44 +29,99 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
+import {
+  fetchCategories,
+  saveCategory,
+  updateCategoryDoc,
+  deleteCategoryDoc,
+  fetchAccounts,
+  saveAccount,
+  updateAccountDoc,
+  deleteAccountDoc
+} from '@/contexts/firebaseService';
 
 const Categories = () => {
-  const { transactions } = useFinance();
+  const { transactions, user } = useFinance();
   const [activeTab, setActiveTab] = useState('categories');
+  const [loading, setLoading] = useState(true);
   
-  // Extract unique categories and accounts from transactions
-  const uniqueCategories = Array.from(new Set(transactions.map(t => t.category))).sort();
-  const uniqueAccounts = Array.from(new Set(transactions.map(t => t.account))).sort();
+  // States for categories and accounts
+  const [categories, setCategories] = useState<{id: string, name: string}[]>([]);
+  const [accounts, setAccounts] = useState<{id: string, name: string}[]>([]);
   
   // States for new entries
   const [newCategory, setNewCategory] = useState('');
   const [newAccount, setNewAccount] = useState('');
-  const [editingCategory, setEditingCategory] = useState<{id: number, name: string} | null>(null);
-  const [editingAccount, setEditingAccount] = useState<{id: number, name: string} | null>(null);
+  const [editingCategory, setEditingCategory] = useState<{id: string, name: string} | null>(null);
+  const [editingAccount, setEditingAccount] = useState<{id: string, name: string} | null>(null);
+  
+  // Load categories and accounts from Firebase
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      if (user) {
+        try {
+          const fetchedCategories = await fetchCategories(user.uid);
+          const fetchedAccounts = await fetchAccounts(user.uid);
+          
+          setCategories(fetchedCategories);
+          setAccounts(fetchedAccounts);
+        } catch (error) {
+          console.error("Error loading categories/accounts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load data from Firebase",
+            variant: "destructive"
+          });
+        }
+      } else {
+        // When not logged in, use categories and accounts from transactions
+        const uniqueCategories = Array.from(new Set(transactions.map(t => t.category)))
+          .filter(Boolean)
+          .map(name => ({
+            id: uuidv4(),
+            name: name || ''
+          }));
+        
+        const uniqueAccounts = Array.from(new Set(transactions.map(t => t.account)))
+          .filter(Boolean)
+          .map(name => ({
+            id: uuidv4(),
+            name: name || ''
+          }));
+        
+        setCategories(uniqueCategories);
+        setAccounts(uniqueAccounts);
+      }
+      setLoading(false);
+    };
+    
+    loadData();
+  }, [user, transactions]);
   
   // Generate category/account usage statistics
-  const categoryStats = uniqueCategories.map(category => {
-    const count = transactions.filter(t => t.category === category).length;
+  const categoryStats = categories.map(category => {
+    const count = transactions.filter(t => t.category === category.name).length;
     const totalAmount = transactions
-      .filter(t => t.category === category)
+      .filter(t => t.category === category.name)
       .reduce((sum, t) => sum + (t.type === 'Expense' ? t.amount : 0), 0);
-    return { name: category, count, totalAmount };
+    return { ...category, count, totalAmount };
   });
   
-  const accountStats = uniqueAccounts.map(account => {
-    const count = transactions.filter(t => t.account === account).length;
+  const accountStats = accounts.map(account => {
+    const count = transactions.filter(t => t.account === account.name).length;
     const totalIncome = transactions
-      .filter(t => t.account === account && t.type === 'Income')
+      .filter(t => t.account === account.name && t.type === 'Income')
       .reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = transactions
-      .filter(t => t.account === account && t.type === 'Expense')
+      .filter(t => t.account === account.name && t.type === 'Expense')
       .reduce((sum, t) => sum + t.amount, 0);
     const balance = totalIncome - totalExpense;
-    return { name: account, count, balance, totalIncome, totalExpense };
+    return { ...account, count, balance, totalIncome, totalExpense };
   });
   
   // Add new category
-  const addCategory = () => {
+  const addCategory = async () => {
     if (!newCategory.trim()) {
       toast({
         title: "Category name required",
@@ -76,7 +131,7 @@ const Categories = () => {
       return;
     }
     
-    if (uniqueCategories.includes(newCategory.trim())) {
+    if (categories.some(cat => cat.name.toLowerCase() === newCategory.trim().toLowerCase())) {
       toast({
         title: "Category already exists",
         description: `The category "${newCategory}" already exists.`,
@@ -85,18 +140,40 @@ const Categories = () => {
       return;
     }
     
-    // In a real app, this would add to the database
-    // For now, we'll just show a toast and update our local state
-    toast({
-      title: "Category added",
-      description: `The category "${newCategory}" has been added.`,
-    });
+    const newCategoryObj = {
+      id: uuidv4(),
+      name: newCategory.trim()
+    };
     
-    setNewCategory('');
+    try {
+      if (user) {
+        await saveCategory(user.uid, newCategoryObj);
+        // Refresh categories from Firebase
+        const updatedCategories = await fetchCategories(user.uid);
+        setCategories(updatedCategories);
+      } else {
+        // Local update when not signed in
+        setCategories(prev => [...prev, newCategoryObj]);
+      }
+      
+      toast({
+        title: "Category added",
+        description: `The category "${newCategory}" has been added.`,
+      });
+      
+      setNewCategory('');
+    } catch (error) {
+      console.error("Error adding category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add category",
+        variant: "destructive"
+      });
+    }
   };
   
   // Add new account
-  const addAccount = () => {
+  const addAccount = async () => {
     if (!newAccount.trim()) {
       toast({
         title: "Account name required",
@@ -106,7 +183,7 @@ const Categories = () => {
       return;
     }
     
-    if (uniqueAccounts.includes(newAccount.trim())) {
+    if (accounts.some(acc => acc.name.toLowerCase() === newAccount.trim().toLowerCase())) {
       toast({
         title: "Account already exists",
         description: `The account "${newAccount}" already exists.`,
@@ -115,14 +192,36 @@ const Categories = () => {
       return;
     }
     
-    // In a real app, this would add to the database
-    // For now, we'll just show a toast and update our local state
-    toast({
-      title: "Account added",
-      description: `The account "${newAccount}" has been added.`,
-    });
+    const newAccountObj = {
+      id: uuidv4(),
+      name: newAccount.trim()
+    };
     
-    setNewAccount('');
+    try {
+      if (user) {
+        await saveAccount(user.uid, newAccountObj);
+        // Refresh accounts from Firebase
+        const updatedAccounts = await fetchAccounts(user.uid);
+        setAccounts(updatedAccounts);
+      } else {
+        // Local update when not signed in
+        setAccounts(prev => [...prev, newAccountObj]);
+      }
+      
+      toast({
+        title: "Account added",
+        description: `The account "${newAccount}" has been added.`,
+      });
+      
+      setNewAccount('');
+    } catch (error) {
+      console.error("Error adding account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add account",
+        variant: "destructive"
+      });
+    }
   };
   
   // Format currency
@@ -133,8 +232,8 @@ const Categories = () => {
     }).format(amount);
   };
   
-  // Update category name (placeholder for actual functionality)
-  const updateCategory = (oldName: string, newName: string) => {
+  // Update category name
+  const updateCategory = async (category: { id: string, name: string }, newName: string) => {
     if (!newName.trim()) {
       toast({
         title: "Category name required",
@@ -144,7 +243,7 @@ const Categories = () => {
       return;
     }
     
-    if (oldName !== newName && uniqueCategories.includes(newName.trim())) {
+    if (category.name !== newName && categories.some(cat => cat.name.toLowerCase() === newName.trim().toLowerCase())) {
       toast({
         title: "Category already exists",
         description: `The category "${newName}" already exists.`,
@@ -153,17 +252,40 @@ const Categories = () => {
       return;
     }
     
-    // In a real app, this would update the database
-    toast({
-      title: "Category updated",
-      description: `Category "${oldName}" has been renamed to "${newName}".`,
-    });
-    
-    setEditingCategory(null);
+    try {
+      const updatedCategory = {
+        id: category.id,
+        name: newName.trim()
+      };
+      
+      if (user) {
+        await updateCategoryDoc(user.uid, updatedCategory);
+        // Refresh categories from Firebase
+        const updatedCategories = await fetchCategories(user.uid);
+        setCategories(updatedCategories);
+      } else {
+        // Local update when not signed in
+        setCategories(prev => prev.map(c => c.id === category.id ? updatedCategory : c));
+      }
+      
+      toast({
+        title: "Category updated",
+        description: `Category "${category.name}" has been renamed to "${newName}".`,
+      });
+      
+      setEditingCategory(null);
+    } catch (error) {
+      console.error("Error updating category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update category",
+        variant: "destructive"
+      });
+    }
   };
   
-  // Update account name (placeholder for actual functionality)
-  const updateAccount = (oldName: string, newName: string) => {
+  // Update account name
+  const updateAccount = async (account: { id: string, name: string }, newName: string) => {
     if (!newName.trim()) {
       toast({
         title: "Account name required",
@@ -173,7 +295,7 @@ const Categories = () => {
       return;
     }
     
-    if (oldName !== newName && uniqueAccounts.includes(newName.trim())) {
+    if (account.name !== newName && accounts.some(acc => acc.name.toLowerCase() === newName.trim().toLowerCase())) {
       toast({
         title: "Account already exists",
         description: `The account "${newName}" already exists.`,
@@ -182,32 +304,99 @@ const Categories = () => {
       return;
     }
     
-    // In a real app, this would update the database
-    toast({
-      title: "Account updated",
-      description: `Account "${oldName}" has been renamed to "${newName}".`,
-    });
-    
-    setEditingAccount(null);
+    try {
+      const updatedAccount = {
+        id: account.id,
+        name: newName.trim()
+      };
+      
+      if (user) {
+        await updateAccountDoc(user.uid, updatedAccount);
+        // Refresh accounts from Firebase
+        const updatedAccounts = await fetchAccounts(user.uid);
+        setAccounts(updatedAccounts);
+      } else {
+        // Local update when not signed in
+        setAccounts(prev => prev.map(a => a.id === account.id ? updatedAccount : a));
+      }
+      
+      toast({
+        title: "Account updated",
+        description: `Account "${account.name}" has been renamed to "${newName}".`,
+      });
+      
+      setEditingAccount(null);
+    } catch (error) {
+      console.error("Error updating account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update account",
+        variant: "destructive"
+      });
+    }
   };
   
-  // Delete category (placeholder for actual functionality)
-  const deleteCategory = (name: string) => {
-    // In a real app, this would delete from the database or reassign transactions
-    toast({
-      title: "Category deleted",
-      description: `The category "${name}" has been deleted.`,
-    });
+  // Delete category
+  const deleteCategory = async (category: { id: string, name: string }) => {
+    try {
+      if (user) {
+        await deleteCategoryDoc(user.uid, category.id);
+        // Refresh categories from Firebase
+        const updatedCategories = await fetchCategories(user.uid);
+        setCategories(updatedCategories);
+      } else {
+        // Local update when not signed in
+        setCategories(prev => prev.filter(c => c.id !== category.id));
+      }
+      
+      toast({
+        title: "Category deleted",
+        description: `The category "${category.name}" has been deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive"
+      });
+    }
   };
   
-  // Delete account (placeholder for actual functionality)
-  const deleteAccount = (name: string) => {
-    // In a real app, this would delete from the database or reassign transactions
-    toast({
-      title: "Account deleted",
-      description: `The account "${name}" has been deleted.`,
-    });
+  // Delete account
+  const deleteAccount = async (account: { id: string, name: string }) => {
+    try {
+      if (user) {
+        await deleteAccountDoc(user.uid, account.id);
+        // Refresh accounts from Firebase
+        const updatedAccounts = await fetchAccounts(user.uid);
+        setAccounts(updatedAccounts);
+      } else {
+        // Local update when not signed in
+        setAccounts(prev => prev.filter(a => a.id !== account.id));
+      }
+      
+      toast({
+        title: "Account deleted",
+        description: `The account "${account.name}" has been deleted.`,
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account",
+        variant: "destructive"
+      });
+    }
   };
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6 pb-8 animate-in">
@@ -279,10 +468,10 @@ const Categories = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    categoryStats.map((stat, index) => (
-                      <TableRow key={index}>
+                    categoryStats.map((stat) => (
+                      <TableRow key={stat.id}>
                         <TableCell>
-                          {editingCategory && editingCategory.id === index ? (
+                          {editingCategory && editingCategory.id === stat.id ? (
                             <div className="flex gap-2">
                               <Input 
                                 value={editingCategory.name}
@@ -299,7 +488,7 @@ const Categories = () => {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                onClick={() => updateCategory(stat.name, editingCategory.name)}
+                                onClick={() => updateCategory(stat, editingCategory.name)}
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -320,7 +509,7 @@ const Categories = () => {
                             <Button 
                               variant="ghost" 
                               size="icon"
-                              onClick={() => setEditingCategory({id: index, name: stat.name})}
+                              onClick={() => setEditingCategory({id: stat.id, name: stat.name})}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -339,7 +528,7 @@ const Categories = () => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteCategory(stat.name)} className="bg-red-500 hover:bg-red-600">
+                                  <AlertDialogAction onClick={() => deleteCategory(stat)} className="bg-red-500 hover:bg-red-600">
                                     Delete
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -407,10 +596,10 @@ const Categories = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    accountStats.map((stat, index) => (
-                      <TableRow key={index}>
+                    accountStats.map((stat) => (
+                      <TableRow key={stat.id}>
                         <TableCell>
-                          {editingAccount && editingAccount.id === index ? (
+                          {editingAccount && editingAccount.id === stat.id ? (
                             <div className="flex gap-2">
                               <Input 
                                 value={editingAccount.name}
@@ -427,7 +616,7 @@ const Categories = () => {
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                onClick={() => updateAccount(stat.name, editingAccount.name)}
+                                onClick={() => updateAccount(stat, editingAccount.name)}
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -452,7 +641,7 @@ const Categories = () => {
                             <Button 
                               variant="ghost" 
                               size="icon"
-                              onClick={() => setEditingAccount({id: index, name: stat.name})}
+                              onClick={() => setEditingAccount({id: stat.id, name: stat.name})}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -471,7 +660,7 @@ const Categories = () => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteAccount(stat.name)} className="bg-red-500 hover:bg-red-600">
+                                  <AlertDialogAction onClick={() => deleteAccount(stat)} className="bg-red-500 hover:bg-red-600">
                                     Delete
                                   </AlertDialogAction>
                                 </AlertDialogFooter>

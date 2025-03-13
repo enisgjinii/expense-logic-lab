@@ -6,8 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CreditCard, Mail, User, Lock } from 'lucide-react';
-import SubscriptionManager from '@/components/SubscriptionManager';
+import { User, Lock } from 'lucide-react';
 
 export default function Profile() {
   const { user, logout } = useFinance();
@@ -38,7 +37,7 @@ export default function Profile() {
       <div className="space-y-0.5">
         <h2 className="text-2xl font-bold tracking-tight">Account Settings</h2>
         <p className="text-muted-foreground">
-          Manage your account settings and subscription
+          Manage your account settings
         </p>
       </div>
 
@@ -47,10 +46,6 @@ export default function Profile() {
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            <span className="hidden sm:inline">Subscription</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Lock className="h-4 w-4" />
@@ -106,10 +101,6 @@ export default function Profile() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="subscription" className="space-y-4">
-          <SubscriptionManager />
-        </TabsContent>
-
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
