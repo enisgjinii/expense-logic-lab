@@ -18,6 +18,7 @@ import Categories from "./pages/Categories";
 import { FinanceProvider } from "./contexts/FinanceContext";
 import { useFinance } from "./contexts/FinanceContext";
 
+// Initialize query client for React Query
 const queryClient = new QueryClient();
 
 // Protected route component

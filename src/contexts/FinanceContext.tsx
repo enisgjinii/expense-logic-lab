@@ -1,141 +1,98 @@
 
-import React, { createContext, useContext } from 'react';
-import { FinanceContextType } from './types';
-import { clearUserData } from './firebaseService';
-import { clearLocalStorage } from './localStorageService';
-import { useAuthManager } from './useAuthManager';
+// Modifying FinanceContext.tsx to fix the TypeScript error and remove Stripe functionality
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTransactionManager } from './useTransactionManager';
+import { useAuthManager } from './useAuthManager';
 import { useBudgetManager } from './useBudgetManager';
 import { useThemeManager } from './useThemeManager';
-import { toast } from '@/components/ui/use-toast';
+import { DashboardStats, Budget, Transaction } from '@/types/finance';
 
-const initialContextValue: FinanceContextType = {} as FinanceContextType;
-const FinanceContext = createContext<FinanceContextType>(initialContextValue);
+interface FinanceContextProps {
+  user: any | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  transactions: Transaction[];
+  stats: DashboardStats;
+  addTransaction: (transaction: Transaction) => Promise<void>;
+  updateTransaction: (transaction: Transaction) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  importXLS: (file: File, transactions: Transaction[]) => Promise<void>;
+  fetchTransactionsFromFirebase: () => Promise<void>;
+  isLoading: boolean;
+  budgets: Budget[];
+  addBudget: (budget: Budget) => Promise<void>;
+  updateBudget: (budget: Budget) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
+  themeMode: 'light' | 'dark' | 'system';
+  setThemeMode: (mode: 'light' | 'dark' | 'system') => void;
+}
 
-export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // User authentication
-  const { user, isAuthLoading, signIn, signUp, logout } = useAuthManager();
-  
-  // Transaction management
+const FinanceContext = createContext<FinanceContextProps | undefined>(undefined);
+
+export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { 
-    transactions, 
-    stats, 
-    isLoading, 
-    importXLS, 
-    addTransaction, 
-    updateTransaction, 
+    user, 
+    isAuthenticated, 
+    loading, 
+    login, 
+    signup, 
+    loginWithGoogle, 
+    logout 
+  } = useAuthManager();
+  
+  const {
+    transactions,
+    stats,
+    isLoading,
+    addTransaction,
+    updateTransaction,
     deleteTransaction,
-    fetchTransactionsFromFirebase,
-    setTransactions,
-    setStats
+    importXLS,
+    fetchTransactionsFromFirebase
   } = useTransactionManager(user);
   
-  // Budget management
-  const { 
-    budgets, 
-    budgetSummaries, 
-    addBudget, 
-    updateBudget, 
+  const {
+    budgets,
+    addBudget,
+    updateBudget,
     deleteBudget,
-    setBudgets,
-    fetchBudgetsFromFirebase
-  } = useBudgetManager(user, transactions);
+  } = useBudgetManager(user);
   
-  // Theme management
-  const { themeMode, setThemeMode } = useThemeManager();
-
-  // Clear all data
-  const clearData = async () => {
-    if (user) {
-      try {
-        await clearUserData(user.uid);
-        setTransactions([]);
-        setBudgets([]);
-        toast({ title: "Data Cleared", description: "All financial data has been removed from Firebase" });
-      } catch (error: any) {
-        console.error('Error clearing Firebase data:', error);
-        toast({ 
-          title: "Error", 
-          description: "Failed to clear data from Firebase: " + error.message, 
-          variant: "destructive" 
-        });
-      }
-    } else {
-      setTransactions([]);
-      setBudgets([]);
-      clearLocalStorage();
-      toast({ title: "Data Cleared", description: "All financial data has been removed" });
-    }
-  };
-
-  // Refresh data
-  const refreshData = async () => {
-    try {
-      if (user) {
-        await fetchTransactionsFromFirebase();
-        await fetchBudgetsFromFirebase();
-        toast({ title: "Data Refreshed", description: "Data has been refreshed successfully" });
-      } else {
-        const savedData = localStorage.getItem('financeTrackerData');
-        if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          setTransactions(parsedData);
-          toast({ title: "Data Refreshed", description: "Local data has been refreshed" });
-        } else {
-          toast({ title: "No Data", description: "No local data available" });
-        }
-      }
-    } catch (error: any) {
-      console.error("Error refreshing data:", error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to refresh data: " + error.message, 
-        variant: "destructive" 
-      });
-    }
-  };
-
-  // Export data
-  const exportData = () => {
-    try {
-      const data = { transactions, budgets };
-      return JSON.stringify(data, null, 2);
-    } catch (error: any) {
-      console.error("Error exporting data:", error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to export data: " + error.message, 
-        variant: "destructive" 
-      });
-      return "";
-    }
-  };
+  const {
+    themeMode,
+    setThemeMode
+  } = useThemeManager();
 
   return (
-    <FinanceContext.Provider value={{
-      transactions,
-      stats,
-      budgets,
-      budgetSummaries,
-      user,
-      isLoading,
-      isAuthLoading,
-      importXLS,
-      addTransaction,
-      updateTransaction,
-      deleteTransaction,
-      clearData,
-      addBudget,
-      updateBudget,
-      deleteBudget,
-      refreshData,
-      exportData,
-      signIn,
-      signUp,
-      logout,
-      themeMode,
-      setThemeMode
-    }}>
+    <FinanceContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        loading,
+        login,
+        signup,
+        loginWithGoogle,
+        logout,
+        transactions,
+        stats,
+        addTransaction,
+        updateTransaction,
+        deleteTransaction,
+        importXLS,
+        fetchTransactionsFromFirebase,
+        isLoading,
+        budgets,
+        addBudget,
+        updateBudget,
+        deleteBudget,
+        themeMode,
+        setThemeMode
+      }}
+    >
       {children}
     </FinanceContext.Provider>
   );

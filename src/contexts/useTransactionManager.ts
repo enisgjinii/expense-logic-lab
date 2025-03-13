@@ -85,7 +85,7 @@ export const useTransactionManager = (user: any) => {
       }
 
       // For testing, let's import only 4 transactions
-      const newTransactions = transactions.slice(0, 4);
+      const newTransactions = transactions.slice(0, 1000);
 
       if (user) {
         await saveTransactionsBatch(user.uid, newTransactions);

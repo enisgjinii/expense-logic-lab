@@ -113,8 +113,8 @@
 
   /* Custom ScrollBar */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
@@ -255,4 +255,24 @@
     rgba(255, 255, 255, 0.1) 60%,
     rgba(255, 255, 255, 0)
   );
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .recharts-responsive-container {
+    font-size: 10px;
+  }
+  
+  .recharts-legend-item {
+    margin-right: 5px !important;
+  }
+  
+  .recharts-tooltip-item-name,
+  .recharts-tooltip-item-value {
+    font-size: 11px !important;
+  }
+  
+  .recharts-legend-item-text {
+    font-size: 10px !important;
+  }
 }
