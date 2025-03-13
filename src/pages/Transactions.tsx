@@ -60,7 +60,7 @@ const Transactions: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h1 className="text-xl sm:text-2xl font-bold">Transactions</h1>
           
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          {/* <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -92,7 +92,7 @@ const Transactions: React.FC = () => {
                 </Button>
               )}
             </div>
-          </div>
+          </div> */}
         </div>
         
         <div className="mt-2 bg-card rounded-md overflow-hidden">

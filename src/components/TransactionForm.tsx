@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
@@ -10,20 +9,20 @@ import { toast } from '@/components/ui/use-toast';
 import { Transaction } from '@/types/finance';
 import { v4 as uuidv4 } from 'uuid';
 import { Loader2, Plus, Save } from 'lucide-react';
-import { Textarea } from './ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 
 interface TransactionFormProps {
   onSuccess?: () => void;
 }
 
 const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
-  const { transactions } = useFinance();
+  const { transactions, addTransaction } = useFinance();
   const [submitting, setSubmitting] = useState(false);
-  
-  // Derive unique categories and accounts from existing transactions
+
+  // Derive unique categories and accounts
   const uniqueCategories = Array.from(new Set(transactions.map(t => t.category))).sort();
   const uniqueAccounts = Array.from(new Set(transactions.map(t => t.account))).sort();
-  
+
   const [formData, setFormData] = useState<Omit<Transaction, 'id'>>({
     account: uniqueAccounts[0] || '',
     category: uniqueCategories[0] || '',
@@ -35,12 +34,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
     description: '',
     currency: 'USD'
   });
-  
+
   const [newAccount, setNewAccount] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [showNewCategory, setShowNewCategory] = useState(false);
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -48,47 +47,41 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
       [name]: name === 'amount' ? parseFloat(value) || 0 : value
     }));
   };
-  
+
   const handleSelectChange = (name: string, value: string) => {
     if (value === 'add_new_account') {
       setShowNewAccount(true);
       return;
     }
-    
     if (value === 'add_new_category') {
       setShowNewCategory(true);
       return;
     }
-    
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
   };
-  
-  const { addTransaction } = useFinance();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    
+
     try {
       // Create final transaction data
       const finalAccount = showNewAccount && newAccount ? newAccount : formData.account;
       const finalCategory = showNewCategory && newCategory ? newCategory : formData.category;
-      
+
       if (!finalAccount) {
         throw new Error('Account is required');
       }
-      
       if (!finalCategory) {
         throw new Error('Category is required');
       }
-      
       if (formData.amount <= 0) {
         throw new Error('Amount must be greater than zero');
       }
-      
+
       const newTransaction: Transaction = {
         id: uuidv4(),
         account: finalAccount,
@@ -101,15 +94,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
         description: formData.description,
         currency: formData.currency
       };
-      
+
       await addTransaction(newTransaction);
-      
+
       toast({
         title: "Transaction Created",
         description: "Your transaction has been successfully added.",
       });
-      
-      // Reset form
+
+      // Reset the form
       setFormData({
         account: finalAccount,
         category: finalCategory,
@@ -121,12 +114,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
         description: '',
         currency: 'USD'
       });
-      
       setNewAccount('');
       setNewCategory('');
       setShowNewAccount(false);
       setShowNewCategory(false);
-      
+
+      // If parent gave an onSuccess callback, call it
       if (onSuccess) {
         onSuccess();
       }
@@ -140,7 +133,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
       setSubmitting(false);
     }
   };
-  
+
   return (
     <Card className="w-full shadow-sm bg-card/60 backdrop-blur-sm border animate-in">
       <CardHeader className="pb-3">
@@ -152,6 +145,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Transaction Type */}
             <div className="space-y-2">
               <Label htmlFor="type">Transaction Type</Label>
               <Select
@@ -167,7 +161,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 </SelectContent>
               </Select>
             </div>
-            
+
+            {/* Amount */}
             <div className="space-y-2">
               <Label htmlFor="amount">Amount</Label>
               <Input
@@ -182,7 +177,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 required
               />
             </div>
-            
+
+            {/* Account (or add new) */}
             <div className="space-y-2">
               {showNewAccount ? (
                 <div className="space-y-2">
@@ -216,9 +212,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueAccounts.map(account => (
-                        <SelectItem key={account} value={account}>
-                          {account}
+                      {uniqueAccounts.map((acc) => (
+                        <SelectItem key={acc} value={acc}>
+                          {acc}
                         </SelectItem>
                       ))}
                       <SelectItem value="add_new_account" className="text-primary font-medium">
@@ -229,7 +225,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 </div>
               )}
             </div>
-            
+
+            {/* Category (or add new) */}
             <div className="space-y-2">
               {showNewCategory ? (
                 <div className="space-y-2">
@@ -263,9 +260,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {uniqueCategories.map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category}
+                      {uniqueCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
                         </SelectItem>
                       ))}
                       <SelectItem value="add_new_category" className="text-primary font-medium">
@@ -276,7 +273,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 </div>
               )}
             </div>
-            
+
+            {/* Payment Method */}
             <div className="space-y-2">
               <Label htmlFor="payment_type">Payment Method</Label>
               <Select
@@ -294,7 +292,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 </SelectContent>
               </Select>
             </div>
-            
+
+            {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
               <Input
@@ -306,7 +305,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
                 required
               />
             </div>
-            
+
+            {/* Notes */}
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="notes">Note (Optional)</Label>
               <Textarea
@@ -321,8 +321,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onSuccess }) => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={submitting}
             className="w-full transition-all hover:scale-[1.01]"
           >
