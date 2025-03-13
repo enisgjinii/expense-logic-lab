@@ -765,7 +765,7 @@ const Reports = () => {
           </Tabs>
         </>
       )}
-    </div>
+  </div>
   )
 }
 

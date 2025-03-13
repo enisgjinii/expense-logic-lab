@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useFinance } from '@/contexts/FinanceContext'
 import { Transaction } from '@/types/finance'
 import { formatCurrency, formatDate } from '@/utils/finance-utils'
@@ -14,7 +14,8 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle
+  CardTitle,
+  CardDescription
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -37,19 +38,219 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
-  FileText
+  FileText,
+  Pencil,
+  Trash,
+  XCircle
 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog'
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
-import TransactionForm from '@/components/TransactionForm'
+import { parseISO, format as formatFns } from 'date-fns'
 
+// ----------------------------------------------------------------------------------
+// Inline TransactionForm for Create/Edit
+// ----------------------------------------------------------------------------------
+type TransactionFormProps = {
+  transaction?: Transaction
+  onSuccess?: () => void
+}
+
+function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
+  const { addTransaction, updateTransaction } = useFinance()
+  const [formData, setFormData] = useState<Omit<Transaction, 'id'>>({
+    date: new Date().toISOString(),
+    account: '',
+    category: '',
+    amount: 0,
+    type: 'Expense',
+    payment_type: 'CASH',
+    notes: '',
+    description: ''
+  })
+
+  useEffect(() => {
+    if (transaction) {
+      setFormData({
+        date: transaction.date,
+        account: transaction.account,
+        category: transaction.category,
+        amount: transaction.amount,
+        type: transaction.type,
+        payment_type: transaction.payment_type || 'TRANSFER',
+        notes: transaction.notes || '',
+        description: transaction.description || ''
+      })
+    }
+  }, [transaction])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    try {
+      if (transaction) {
+        // Edit existing
+        await updateTransaction({
+          ...transaction,
+          ...formData
+        })
+      } else {
+        // Create new
+        await addTransaction({
+          ...formData
+          // Real usage might need an ID, or your backend might handle it.
+        })
+      }
+      if (onSuccess) onSuccess()
+    } catch (error) {
+      console.error('TransactionForm submit error:', error)
+    }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const { name, value } = e.target
+    // Convert `amount` to Number
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'amount' ? Number(value) || 0 : value
+    }))
+  }
+
+  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+    // Convert user-selected date to ISO
+    const selectedDate = new Date(e.target.value)
+    setFormData(prev => ({
+      ...prev,
+      date: selectedDate.toISOString()
+    }))
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="date" className="block text-sm font-medium mb-1">
+          Date
+        </label>
+        <Input
+          id="date"
+          type="date"
+          name="date"
+          value={formatFns(parseISO(formData.date), 'yyyy-MM-dd')}
+          onChange={handleDateChange}
+        />
+      </div>
+      <div>
+        <label htmlFor="account" className="block text-sm font-medium mb-1">
+          Account
+        </label>
+        <Input
+          id="account"
+          name="account"
+          value={formData.account}
+          onChange={handleChange}
+          placeholder="e.g. Checking Account"
+        />
+      </div>
+      <div>
+        <label htmlFor="category" className="block text-sm font-medium mb-1">
+          Category
+        </label>
+        <Input
+          id="category"
+          name="category"
+          value={formData.category}
+          onChange={handleChange}
+          placeholder="e.g. Groceries"
+        />
+      </div>
+      <div>
+        <label htmlFor="amount" className="block text-sm font-medium mb-1">
+          Amount
+        </label>
+        <Input
+          id="amount"
+          name="amount"
+          type="number"
+          step="0.01"
+          value={formData.amount.toString()}
+          onChange={handleChange}
+        />
+      </div>
+      <div>
+        <label htmlFor="type" className="block text-sm font-medium mb-1">
+          Transaction Type
+        </label>
+        <select
+          id="type"
+          name="type"
+          className="border rounded p-2 w-full focus:outline-none text-sm"
+          value={formData.type}
+          onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+        >
+          <option value="Income">Income</option>
+          <option value="Expense">Expense</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="payment_type" className="block text-sm font-medium mb-1">
+          Payment Type
+        </label>
+        <select
+          id="payment_type"
+          name="payment_type"
+          className="border rounded p-2 w-full focus:outline-none text-sm"
+          value={formData.payment_type}
+          onChange={(e) => setFormData(prev => ({ ...prev, payment_type: e.target.value }))}
+        >
+          <option value="CASH">Cash</option>
+          <option value="CREDIT_CARD">Credit Card</option>
+          <option value="DEBIT_CARD">Debit Card</option>
+          <option value="TRANSFER">Transfer</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="notes" className="block text-sm font-medium mb-1">
+          Notes
+        </label>
+        <Input
+          id="notes"
+          name="notes"
+          value={formData.notes}
+          onChange={handleChange}
+          placeholder="Short notes"
+        />
+      </div>
+      <div>
+        <label htmlFor="description" className="block text-sm font-medium mb-1">
+          Description
+        </label>
+        <Input
+          id="description"
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          placeholder="Optional longer description"
+        />
+      </div>
+      <div className="flex justify-end pt-2">
+        <Button type="submit">
+          {transaction ? 'Save Changes' : 'Create Transaction'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// ----------------------------------------------------------------------------------
+// PaymentType Icon helper
+// ----------------------------------------------------------------------------------
 function PaymentTypeIcon({ type }: { type: string }) {
   switch (type) {
     case 'CREDIT_CARD':
@@ -64,9 +265,17 @@ function PaymentTypeIcon({ type }: { type: string }) {
   }
 }
 
-export default function TransactionsTable() {
-  const { transactions } = useFinance()
+// ----------------------------------------------------------------------------------
+// Main TransactionsPage
+// ----------------------------------------------------------------------------------
+export default function TransactionsPage() {
+  const { transactions, deleteTransaction } = useFinance()
+
   const [openCreateModal, setOpenCreateModal] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
+
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState<string | null>(null)
@@ -74,16 +283,14 @@ export default function TransactionsTable() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [sortBy, setSortBy] = useState<keyof Transaction>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  
-  const allAccounts = useMemo(() => {
-    const set = new Set<string>()
-    transactions.forEach(tx => set.add(tx.account))
-    return Array.from(set).sort()
-  }, [transactions])
 
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+
+  // Filter logic
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const query = searchTerm.toLowerCase()
@@ -91,21 +298,26 @@ export default function TransactionsTable() {
         tx.account.toLowerCase(),
         tx.category.toLowerCase(),
         (tx.notes || '').toLowerCase(),
-        (tx.description || '').toLowerCase(),
+        (tx.description || '').toLowerCase()
       ].some(str => str.includes(query))
+
       const matchesType = typeFilter ? tx.type === typeFilter : true
       const matchesPayment = paymentFilter ? tx.payment_type === paymentFilter : true
       const matchesAccount = accountFilter ? tx.account === accountFilter : true
+
       let matchesDate = true
       const txDate = new Date(tx.date)
       if (dateRange?.from) matchesDate = txDate >= dateRange.from
       if (dateRange?.to) matchesDate = matchesDate && txDate <= dateRange.to
+
       return matchesSearch && matchesType && matchesPayment && matchesAccount && matchesDate
     })
   }, [transactions, searchTerm, typeFilter, paymentFilter, accountFilter, dateRange])
 
+  // Sort logic
   const sortedTransactions = useMemo(() => {
-    const sorted = [...filteredTransactions].sort((a, b) => {
+    const sorted = [...filteredTransactions]
+    sorted.sort((a, b) => {
       let valA: any = a[sortBy]
       let valB: any = b[sortBy]
       if (sortBy === 'date') {
@@ -119,13 +331,19 @@ export default function TransactionsTable() {
     return sorted
   }, [filteredTransactions, sortBy, sortOrder])
 
+  // Pagination logic
   const startIndex = (currentPage - 1) * pageSize
   const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize)
   const totalPages = Math.ceil(sortedTransactions.length / pageSize)
 
+  // Summaries
   const summary = useMemo(() => {
-    const totalIncome = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0)
-    const totalExpense = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0)
+    const totalIncome = filteredTransactions
+      .filter(t => t.type === 'Income')
+      .reduce((acc, t) => acc + t.amount, 0)
+    const totalExpense = filteredTransactions
+      .filter(t => t.type === 'Expense')
+      .reduce((acc, t) => acc + t.amount, 0)
     return {
       totalIncome,
       totalExpense,
@@ -134,10 +352,16 @@ export default function TransactionsTable() {
   }, [filteredTransactions])
 
   const accountsSummary = useMemo(() => {
+    // Summaries by account
     const map = new Map<string, { account: string; totalIncome: number; totalExpense: number; count: number }>()
     filteredTransactions.forEach(tx => {
       if (!map.has(tx.account)) {
-        map.set(tx.account, { account: tx.account, totalIncome: 0, totalExpense: 0, count: 0 })
+        map.set(tx.account, {
+          account: tx.account,
+          totalIncome: 0,
+          totalExpense: 0,
+          count: 0
+        })
       }
       const data = map.get(tx.account)!
       data.count += 1
@@ -145,13 +369,23 @@ export default function TransactionsTable() {
       else data.totalExpense += tx.amount
     })
     const result = Array.from(map.values()).map(a => ({ ...a, net: a.totalIncome - a.totalExpense }))
+    // Sort descending by net
     result.sort((a, b) => b.net - a.net)
     return result
   }, [filteredTransactions])
 
+  // Distinct accounts for filter
+  const allAccounts = useMemo(() => {
+    const set = new Set<string>()
+    transactions.forEach(tx => set.add(tx.account))
+    return Array.from(set).sort()
+  }, [transactions])
+
+  // Sorting helpers
   function handleSort(column: keyof Transaction) {
-    if (sortBy === column) setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    else {
+    if (sortBy === column) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
       setSortBy(column)
       setSortOrder('asc')
     }
@@ -171,8 +405,9 @@ export default function TransactionsTable() {
     setCurrentPage(1)
   }
 
+  // CSV export
   function handleExportCSV() {
-    const headers = ['Date','Account','Category','Amount','Type','Payment','Notes','Description']
+    const headers = ['Date', 'Account', 'Category', 'Amount', 'Type', 'Payment', 'Notes', 'Description']
     const csvRows = [headers.join(',')]
     sortedTransactions.forEach(tx => {
       const row = [
@@ -197,6 +432,7 @@ export default function TransactionsTable() {
     document.body.removeChild(link)
   }
 
+  // Expand/Collapse row
   function toggleRowExpansion(id: string) {
     setExpandedRows(prev => {
       const newSet = new Set(prev)
@@ -205,26 +441,240 @@ export default function TransactionsTable() {
     })
   }
 
-  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  // CRUD: Edit & Delete
+  function handleEdit(tx: Transaction) {
+    setSelectedTx(tx)
+    setEditModalOpen(true)
+  }
 
+  function handleDelete(tx: Transaction) {
+    setSelectedTx(tx)
+    setDeleteModalOpen(true)
+  }
+
+  async function confirmDelete() {
+    if (!selectedTx) return
+    try {
+      await deleteTransaction(selectedTx.id)
+      setDeleteModalOpen(false)
+      setSelectedTx(null)
+    } catch (error) {
+      console.error('Delete error:', error)
+    }
+  }
+
+  // INVOICE
   function openInvoice(tx: Transaction) {
     setSelectedTx(tx)
     setInvoiceModalOpen(true)
   }
 
-  function handlePrintInvoice() {
-    window.print()
-  }
-
+  // Render
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
+
+      {/* FILTERS + CREATE BUTTON */}
+      <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Filter Transactions</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
+            Narrow down your transactions with filters
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
+            {/* Search */}
+            <div className="relative w-full sm:w-[300px]">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search transactions..."
+                value={searchTerm}
+                onChange={e => {
+                  setSearchTerm(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+
+            {/* Date Range */}
+            <DateRangePicker
+              dateRange={dateRange}
+              onDateRangeChange={range => {
+                setDateRange(range)
+                setCurrentPage(1)
+              }}
+            />
+
+            {/* Dropdown Filters */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">More Filters</span>
+                  <span className="sm:hidden">Filter</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[240px]">
+                {/* Type Filter */}
+                <DropdownMenuItem
+                  onClick={() => {
+                    setTypeFilter(null)
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  All Types {typeFilter === null && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setTypeFilter('Income')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  Income {typeFilter === 'Income' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setTypeFilter('Expense')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  Expense {typeFilter === 'Expense' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="h-px my-1 p-0" />
+
+                {/* Payment Filter */}
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPaymentFilter(null)
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  All Payments {paymentFilter === null && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPaymentFilter('CASH')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  <div className="flex items-center">
+                    <PaymentTypeIcon type="CASH" />
+                    Cash
+                  </div>
+                  {paymentFilter === 'CASH' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPaymentFilter('CREDIT_CARD')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  <div className="flex items-center">
+                    <PaymentTypeIcon type="CREDIT_CARD" />
+                    Credit Card
+                  </div>
+                  {paymentFilter === 'CREDIT_CARD' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPaymentFilter('DEBIT_CARD')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  <div className="flex items-center">
+                    <PaymentTypeIcon type="DEBIT_CARD" />
+                    Debit Card
+                  </div>
+                  {paymentFilter === 'DEBIT_CARD' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPaymentFilter('TRANSFER')
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  <div className="flex items-center">
+                    <PaymentTypeIcon type="TRANSFER" />
+                    Transfer
+                  </div>
+                  {paymentFilter === 'TRANSFER' && <span>✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="h-px my-1 p-0" />
+
+                {/* Account Filter */}
+                <DropdownMenuItem
+                  onClick={() => {
+                    setAccountFilter(null)
+                    setCurrentPage(1)
+                  }}
+                  className="justify-between text-sm"
+                >
+                  All Accounts {accountFilter === null && <span>✓</span>}
+                </DropdownMenuItem>
+                {allAccounts.map(acc => (
+                  <DropdownMenuItem
+                    key={acc}
+                    onClick={() => {
+                      setAccountFilter(acc)
+                      setCurrentPage(1)
+                    }}
+                    className="justify-between text-sm"
+                  >
+                    {acc} {accountFilter === acc && <span>✓</span>}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Reset */}
+            <Button variant="outline" size="sm" onClick={resetFilters}>
+              Reset
+            </Button>
+          </div>
+
+          {/* Create & Export */}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <Download className="mr-1 h-4 w-4" />
+              Export CSV
+            </Button>
+            <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
+              <DialogTrigger asChild>
+                <Button variant="default" size="sm">
+                  + New Transaction
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Create a new transaction</DialogTitle>
+                </DialogHeader>
+                <TransactionForm onSuccess={() => setOpenCreateModal(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ACCOUNTS OVERVIEW */}
       {accountsSummary.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-xl font-bold">Accounts Overview</h2>
+          <h2 className="text-xl font-bold mt-4">Accounts Overview</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {accountsSummary.map(acc => (
-              <Card key={acc.account} className="border bg-card/60 backdrop-blur-sm shadow-sm">
+              <Card
+                key={acc.account}
+                className="border bg-card/60 backdrop-blur-sm shadow-sm"
+              >
                 <CardHeader className="pb-1 px-4 pt-4">
                   <CardTitle className="text-lg truncate">{acc.account}</CardTitle>
                 </CardHeader>
@@ -233,7 +683,7 @@ export default function TransactionsTable() {
                   <p>Income: <span className="font-medium">{formatCurrency(acc.totalIncome)}</span></p>
                   <p>Expense: <span className="font-medium">{formatCurrency(acc.totalExpense)}</span></p>
                   <p>
-                    Net: <span className={`font-semibold ${acc.net >= 0 ? 'text-income' : 'text-expense'}`}>
+                    Net: <span className={acc.net >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
                       {formatCurrency(acc.net)}
                     </span>
                   </p>
@@ -244,6 +694,7 @@ export default function TransactionsTable() {
         </div>
       )}
 
+      {/* SUMMARY */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-6">
         <div>
           <h2 className="text-2xl font-bold">Transactions Summary</h2>
@@ -259,148 +710,9 @@ export default function TransactionsTable() {
             </Badge>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 justify-start md:justify-end">
-          <Button variant="outline" size="sm" onClick={handleExportCSV}>
-            <Download className="mr-1 h-4 w-4" />
-            CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={resetFilters}>
-            Reset Filters
-          </Button>
-          <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
-            <DialogTrigger asChild>
-              <Button variant="default" size="sm">
-                + New Transaction
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Create a new transaction</DialogTitle>
-              </DialogHeader>
-              <TransactionForm onSuccess={() => setOpenCreateModal(false)} />
-            </DialogContent>
-          </Dialog>
-        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
-        <div className="relative w-full sm:w-auto">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search transactions..."
-            value={searchTerm}
-            onChange={e => {
-              setSearchTerm(e.target.value)
-              setCurrentPage(1)
-            }}
-            className="pl-9 h-9 w-full sm:w-[200px] md:w-[300px] text-sm"
-          />
-        </div>
-        <DateRangePicker
-          dateRange={dateRange}
-          onDateRangeChange={range => {
-            setDateRange(range)
-            setCurrentPage(1)
-          }}
-        />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Filters</span>
-              <span className="sm:hidden">Filter</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[240px]">
-            <DropdownMenuItem
-              onClick={() => { setTypeFilter(null); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              All Types {typeFilter === null && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setTypeFilter('Income'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              Income {typeFilter === 'Income' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setTypeFilter('Expense'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              Expense {typeFilter === 'Expense' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="h-px my-1 p-0" />
-            <DropdownMenuItem
-              onClick={() => { setPaymentFilter(null); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              All Payments {paymentFilter === null && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setPaymentFilter('CASH'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              <div className="flex items-center">
-                <PaymentTypeIcon type="CASH" />
-                Cash
-              </div>
-              {paymentFilter === 'CASH' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setPaymentFilter('CREDIT_CARD'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              <div className="flex items-center">
-                <PaymentTypeIcon type="CREDIT_CARD" />
-                Credit Card
-              </div>
-              {paymentFilter === 'CREDIT_CARD' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setPaymentFilter('DEBIT_CARD'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              <div className="flex items-center">
-                <PaymentTypeIcon type="DEBIT_CARD" />
-                Debit Card
-              </div>
-              {paymentFilter === 'DEBIT_CARD' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => { setPaymentFilter('TRANSFER'); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              <div className="flex items-center">
-                <PaymentTypeIcon type="TRANSFER" />
-                Transfer
-              </div>
-              {paymentFilter === 'TRANSFER' && <span>✓</span>}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="h-px my-1 p-0" />
-            <DropdownMenuItem
-              onClick={() => { setAccountFilter(null); setCurrentPage(1) }}
-              className="justify-between text-sm"
-            >
-              All Accounts {accountFilter === null && <span>✓</span>}
-            </DropdownMenuItem>
-            {allAccounts.map(acc => (
-              <DropdownMenuItem
-                key={acc}
-                onClick={() => {
-                  setAccountFilter(acc)
-                  setCurrentPage(1)
-                }}
-                className="justify-between text-sm"
-              >
-                {acc} {accountFilter === acc && <span>✓</span>}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
+      {/* TRANSACTIONS TABLE */}
       <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
         <CardHeader className="py-2 px-4 md:px-6">
           <CardTitle className="text-xl">Transactions</CardTitle>
@@ -408,7 +720,7 @@ export default function TransactionsTable() {
         <CardContent className="p-0">
           <div className="rounded-md border overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead
                     className="w-[90px] md:w-[120px] cursor-pointer text-left px-2 md:px-4"
@@ -448,7 +760,9 @@ export default function TransactionsTable() {
                   <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">
                     Payment
                   </TableHead>
-                  <TableHead className="text-right px-2 md:px-4"></TableHead>
+                  <TableHead className="text-right px-2 md:px-4">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -469,7 +783,7 @@ export default function TransactionsTable() {
                           </TableCell>
                           <TableCell
                             className={`text-right font-medium ${
-                              tx.type === 'Income' ? 'text-income' : 'text-expense'
+                              tx.type === 'Income' ? 'text-green-600' : 'text-red-600'
                             } px-2 md:px-4 text-sm md:text-base`}
                           >
                             {tx.type === 'Income' ? '+' : '-'} {formatCurrency(tx.amount)}
@@ -479,8 +793,8 @@ export default function TransactionsTable() {
                               variant={tx.type === 'Income' ? 'outline' : 'secondary'}
                               className={`w-fit ml-auto px-2 py-0.5 text-xs md:text-xs ${
                                 tx.type === 'Income'
-                                  ? 'border-income/50 bg-income/10 text-income'
-                                  : 'border-expense/50 bg-expense/10 text-expense'
+                                  ? 'border-green-500/50 bg-green-500/10 text-green-600'
+                                  : 'border-red-500/50 bg-red-500/10 text-red-600'
                               }`}
                             >
                               {tx.type}
@@ -501,6 +815,7 @@ export default function TransactionsTable() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right px-2 md:px-4 space-x-2">
+                            {/* Expand */}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -513,14 +828,36 @@ export default function TransactionsTable() {
                                 <ChevronDown className="h-4 w-4" />
                               )}
                             </Button>
+                            {/* Edit */}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
                                 setSelectedTx(tx)
-                                setInvoiceModalOpen(true)
+                                setEditModalOpen(true)
                               }}
                               className="p-0 h-auto w-6 inline-flex items-center justify-center"
+                              title="Edit Transaction"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {/* Delete */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(tx)}
+                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
+                              title="Delete Transaction"
+                            >
+                              <Trash className="h-4 w-4 text-destructive" />
+                            </Button>
+                            {/* Invoice */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openInvoice(tx)}
+                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
+                              title="View Invoice"
                             >
                               <FileText className="h-4 w-4" />
                             </Button>
@@ -581,6 +918,45 @@ export default function TransactionsTable() {
         </CardContent>
       </Card>
 
+      {/* EDIT TRANSACTION MODAL */}
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {selectedTx && (
+            <TransactionForm
+              transaction={selectedTx}
+              onSuccess={() => {
+                setEditModalOpen(false)
+                setSelectedTx(null)
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Transaction</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this transaction? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="space-x-2">
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* INVOICE MODAL */}
       <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
@@ -613,7 +989,9 @@ export default function TransactionsTable() {
               </div>
               <div className="flex justify-between">
                 <p className="font-medium">Amount:</p>
-                <p>{(selectedTx.type === 'Income' ? '+' : '-') + formatCurrency(selectedTx.amount)}</p>
+                <p>
+                  {(selectedTx.type === 'Income' ? '+' : '-') + formatCurrency(selectedTx.amount)}
+                </p>
               </div>
               <div className="flex justify-between">
                 <p className="font-medium">Notes:</p>
@@ -623,11 +1001,7 @@ export default function TransactionsTable() {
                 <p className="font-medium">Description:</p>
                 <p>{selectedTx.description || '-'}</p>
               </div>
-              <Button
-                variant="outline"
-                className="mt-4 w-full"
-                onClick={() => window.print()}
-              >
+              <Button variant="outline" className="mt-4 w-full" onClick={() => window.print()}>
                 Save as PDF / Print
               </Button>
             </div>
