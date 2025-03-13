@@ -7,6 +7,36 @@ export const getCurrentUser = () => {
   return auth.currentUser;
 };
 
+// Subscription Management
+export const updateSubscriptionInDB = async (customerId: string, subscriptionData: any) => {
+  try {
+    // Get user associated with this customer ID
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where("stripeCustomerId", "==", customerId));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.error('No user found with customer ID:', customerId);
+      return false;
+    }
+    
+    // Update the user's subscription data
+    const userDoc = querySnapshot.docs[0];
+    const userRef = doc(db, 'users', userDoc.id);
+    await updateDoc(userRef, {
+      subscription: {
+        ...subscriptionData,
+        updatedAt: serverTimestamp()
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating subscription in DB:', error);
+    throw error;
+  }
+};
+
 // Categories Management
 export const fetchCategoriesForUser = async (userId: string) => {
   try {
