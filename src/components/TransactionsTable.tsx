@@ -2,69 +2,20 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { useFinance } from '@/contexts/FinanceContext'
 import { Transaction } from '@/types/finance'
 import { formatCurrency, formatDate } from '@/utils/finance-utils'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription
-} from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
-import {
-  Search,
-  SlidersHorizontal,
-  SortAsc,
-  SortDesc,
-  CreditCard,
-  Coins,
-  Wallet,
-  ArrowLeftRight,
-  Download,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  Pencil,
-  Trash,
-  XCircle
-} from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription
-} from '@/components/ui/dialog'
+import { Search, SlidersHorizontal, SortAsc, SortDesc, CreditCard, Coins, Wallet, ArrowLeftRight, Download, ChevronDown, ChevronUp, FileText, Pencil, Trash } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
 import { parseISO, format as formatFns } from 'date-fns'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line } from 'recharts'
 
-// ----------------------------------------------------------------------------------
-// Inline TransactionForm for Create/Edit
-// ----------------------------------------------------------------------------------
-type TransactionFormProps = {
-  transaction?: Transaction
-  onSuccess?: () => void
-}
-
-function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
+function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction, onSuccess?: () => void }) {
   const { addTransaction, updateTransaction } = useFinance()
   const [formData, setFormData] = useState<Omit<Transaction, 'id'>>({
     date: new Date().toISOString(),
@@ -76,7 +27,6 @@ function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
     notes: '',
     description: ''
   })
-
   useEffect(() => {
     if (transaction) {
       setFormData({
@@ -91,124 +41,58 @@ function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
       })
     }
   }, [transaction])
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      if (transaction) {
-        // Edit existing
-        await updateTransaction({
-          ...transaction,
-          ...formData
-        })
-      } else {
-        // Create new
-        await addTransaction({
-          ...formData
-          // Real usage might need an ID, or your backend might handle it.
-        })
-      }
+      if (transaction) await updateTransaction({ ...transaction, ...formData })
+      else await addTransaction({ ...formData })
       if (onSuccess) onSuccess()
     } catch (error) {
-      console.error('TransactionForm submit error:', error)
+      console.error('Submit Error:', error)
+      alert('There was an error processing the transaction.')
     }
   }
-
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
-    // Convert `amount` to Number
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'amount' ? Number(value) || 0 : value
-    }))
+    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? Number(value) || 0 : value }))
   }
-
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // Convert user-selected date to ISO
-    const selectedDate = new Date(e.target.value)
-    setFormData(prev => ({
-      ...prev,
-      date: selectedDate.toISOString()
-    }))
+    try {
+      const selectedDate = new Date(e.target.value)
+      setFormData(prev => ({ ...prev, date: selectedDate.toISOString() }))
+    } catch (error) {
+      console.error('Date Change Error:', error)
+      alert('Invalid date selected.')
+    }
   }
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="date" className="block text-sm font-medium mb-1">
-          Date
-        </label>
-        <Input
-          id="date"
-          type="date"
-          name="date"
-          value={formatFns(parseISO(formData.date), 'yyyy-MM-dd')}
-          onChange={handleDateChange}
-        />
+        <label htmlFor="date" className="block text-sm font-medium mb-1">Date</label>
+        <Input id="date" type="date" name="date" value={formatFns(parseISO(formData.date), 'yyyy-MM-dd')} onChange={handleDateChange} />
       </div>
       <div>
-        <label htmlFor="account" className="block text-sm font-medium mb-1">
-          Account
-        </label>
-        <Input
-          id="account"
-          name="account"
-          value={formData.account}
-          onChange={handleChange}
-          placeholder="e.g. Checking Account"
-        />
+        <label htmlFor="account" className="block text-sm font-medium mb-1">Account</label>
+        <Input id="account" name="account" value={formData.account} onChange={handleChange} placeholder="e.g. Checking Account" />
       </div>
       <div>
-        <label htmlFor="category" className="block text-sm font-medium mb-1">
-          Category
-        </label>
-        <Input
-          id="category"
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          placeholder="e.g. Groceries"
-        />
+        <label htmlFor="category" className="block text-sm font-medium mb-1">Category</label>
+        <Input id="category" name="category" value={formData.category} onChange={handleChange} placeholder="e.g. Groceries" />
       </div>
       <div>
-        <label htmlFor="amount" className="block text-sm font-medium mb-1">
-          Amount
-        </label>
-        <Input
-          id="amount"
-          name="amount"
-          type="number"
-          step="0.01"
-          value={formData.amount.toString()}
-          onChange={handleChange}
-        />
+        <label htmlFor="amount" className="block text-sm font-medium mb-1">Amount</label>
+        <Input id="amount" name="amount" type="number" step="0.01" value={formData.amount.toString()} onChange={handleChange} />
       </div>
       <div>
-        <label htmlFor="type" className="block text-sm font-medium mb-1">
-          Transaction Type
-        </label>
-        <select
-          id="type"
-          name="type"
-          className="border rounded p-2 w-full focus:outline-none text-sm"
-          value={formData.type}
-          onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-        >
+        <label htmlFor="type" className="block text-sm font-medium mb-1">Transaction Type</label>
+        <select id="type" name="type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.type} onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}>
           <option value="Income">Income</option>
           <option value="Expense">Expense</option>
         </select>
       </div>
       <div>
-        <label htmlFor="payment_type" className="block text-sm font-medium mb-1">
-          Payment Type
-        </label>
-        <select
-          id="payment_type"
-          name="payment_type"
-          className="border rounded p-2 w-full focus:outline-none text-sm"
-          value={formData.payment_type}
-          onChange={(e) => setFormData(prev => ({ ...prev, payment_type: e.target.value }))}
-        >
+        <label htmlFor="payment_type" className="block text-sm font-medium mb-1">Payment Type</label>
+        <select id="payment_type" name="payment_type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.payment_type} onChange={(e) => setFormData(prev => ({ ...prev, payment_type: e.target.value }))}>
           <option value="CASH">Cash</option>
           <option value="CREDIT_CARD">Credit Card</option>
           <option value="DEBIT_CARD">Debit Card</option>
@@ -216,41 +100,20 @@ function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
         </select>
       </div>
       <div>
-        <label htmlFor="notes" className="block text-sm font-medium mb-1">
-          Notes
-        </label>
-        <Input
-          id="notes"
-          name="notes"
-          value={formData.notes}
-          onChange={handleChange}
-          placeholder="Short notes"
-        />
+        <label htmlFor="notes" className="block text-sm font-medium mb-1">Notes</label>
+        <Input id="notes" name="notes" value={formData.notes} onChange={handleChange} placeholder="Short notes" />
       </div>
       <div>
-        <label htmlFor="description" className="block text-sm font-medium mb-1">
-          Description
-        </label>
-        <Input
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          placeholder="Optional longer description"
-        />
+        <label htmlFor="description" className="block text-sm font-medium mb-1">Description</label>
+        <Input id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Optional longer description" />
       </div>
       <div className="flex justify-end pt-2">
-        <Button type="submit">
-          {transaction ? 'Save Changes' : 'Create Transaction'}
-        </Button>
+        <Button type="submit">{transaction ? 'Save Changes' : 'Create Transaction'}</Button>
       </div>
     </form>
   )
 }
 
-// ----------------------------------------------------------------------------------
-// PaymentType Icon helper
-// ----------------------------------------------------------------------------------
 function PaymentTypeIcon({ type }: { type: string }) {
   switch (type) {
     case 'CREDIT_CARD':
@@ -265,17 +128,12 @@ function PaymentTypeIcon({ type }: { type: string }) {
   }
 }
 
-// ----------------------------------------------------------------------------------
-// Main TransactionsPage
-// ----------------------------------------------------------------------------------
 export default function TransactionsPage() {
   const { transactions, deleteTransaction } = useFinance()
-
   const [openCreateModal, setOpenCreateModal] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
-
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState<string | null>(null)
@@ -283,14 +141,15 @@ export default function TransactionsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [sortBy, setSortBy] = useState<keyof Transaction>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 10
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
-
-  // Filter logic
+  const allAccounts = useMemo(() => {
+    const set = new Set<string>()
+    transactions.forEach(tx => set.add(tx.account))
+    return Array.from(set).sort()
+  }, [transactions])
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const query = searchTerm.toLowerCase()
@@ -300,21 +159,16 @@ export default function TransactionsPage() {
         (tx.notes || '').toLowerCase(),
         (tx.description || '').toLowerCase()
       ].some(str => str.includes(query))
-
       const matchesType = typeFilter ? tx.type === typeFilter : true
       const matchesPayment = paymentFilter ? tx.payment_type === paymentFilter : true
       const matchesAccount = accountFilter ? tx.account === accountFilter : true
-
       let matchesDate = true
       const txDate = new Date(tx.date)
       if (dateRange?.from) matchesDate = txDate >= dateRange.from
       if (dateRange?.to) matchesDate = matchesDate && txDate <= dateRange.to
-
       return matchesSearch && matchesType && matchesPayment && matchesAccount && matchesDate
     })
   }, [transactions, searchTerm, typeFilter, paymentFilter, accountFilter, dateRange])
-
-  // Sort logic
   const sortedTransactions = useMemo(() => {
     const sorted = [...filteredTransactions]
     sorted.sort((a, b) => {
@@ -330,38 +184,19 @@ export default function TransactionsPage() {
     })
     return sorted
   }, [filteredTransactions, sortBy, sortOrder])
-
-  // Pagination logic
   const startIndex = (currentPage - 1) * pageSize
   const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize)
   const totalPages = Math.ceil(sortedTransactions.length / pageSize)
-
-  // Summaries
   const summary = useMemo(() => {
-    const totalIncome = filteredTransactions
-      .filter(t => t.type === 'Income')
-      .reduce((acc, t) => acc + t.amount, 0)
-    const totalExpense = filteredTransactions
-      .filter(t => t.type === 'Expense')
-      .reduce((acc, t) => acc + t.amount, 0)
-    return {
-      totalIncome,
-      totalExpense,
-      balance: totalIncome - totalExpense
-    }
+    const totalIncome = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0)
+    const totalExpense = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0)
+    return { totalIncome, totalExpense, balance: totalIncome - totalExpense }
   }, [filteredTransactions])
-
   const accountsSummary = useMemo(() => {
-    // Summaries by account
     const map = new Map<string, { account: string; totalIncome: number; totalExpense: number; count: number }>()
     filteredTransactions.forEach(tx => {
       if (!map.has(tx.account)) {
-        map.set(tx.account, {
-          account: tx.account,
-          totalIncome: 0,
-          totalExpense: 0,
-          count: 0
-        })
+        map.set(tx.account, { account: tx.account, totalIncome: 0, totalExpense: 0, count: 0 })
       }
       const data = map.get(tx.account)!
       data.count += 1
@@ -369,33 +204,17 @@ export default function TransactionsPage() {
       else data.totalExpense += tx.amount
     })
     const result = Array.from(map.values()).map(a => ({ ...a, net: a.totalIncome - a.totalExpense }))
-    // Sort descending by net
     result.sort((a, b) => b.net - a.net)
     return result
   }, [filteredTransactions])
-
-  // Distinct accounts for filter
-  const allAccounts = useMemo(() => {
-    const set = new Set<string>()
-    transactions.forEach(tx => set.add(tx.account))
-    return Array.from(set).sort()
-  }, [transactions])
-
-  // Sorting helpers
   function handleSort(column: keyof Transaction) {
-    if (sortBy === column) {
-      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortBy(column)
-      setSortOrder('asc')
-    }
+    if (sortBy === column) setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    else { setSortBy(column); setSortOrder('asc') }
   }
-
   function renderSortIcon(column: keyof Transaction) {
     if (sortBy !== column) return null
     return sortOrder === 'asc' ? <SortAsc className="ml-1 h-4 w-4" /> : <SortDesc className="ml-1 h-4 w-4" />
   }
-
   function resetFilters() {
     setSearchTerm('')
     setTypeFilter(null)
@@ -404,35 +223,36 @@ export default function TransactionsPage() {
     setDateRange(undefined)
     setCurrentPage(1)
   }
-
-  // CSV export
   function handleExportCSV() {
-    const headers = ['Date', 'Account', 'Category', 'Amount', 'Type', 'Payment', 'Notes', 'Description']
-    const csvRows = [headers.join(',')]
-    sortedTransactions.forEach(tx => {
-      const row = [
-        formatDate(tx.date),
-        tx.account,
-        tx.category,
-        (tx.type === 'Income' ? '+' : '-') + tx.amount,
-        tx.type,
-        (tx.payment_type || 'TRANSFER').replace('_', ' '),
-        tx.notes || '',
-        tx.description || ''
-      ]
-      csvRows.push(row.join(','))
-    })
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = 'transactions.csv'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    try {
+      const headers = ['Date','Account','Category','Amount','Type','Payment','Notes','Description']
+      const csvRows = [headers.join(',')]
+      sortedTransactions.forEach(tx => {
+        const row = [
+          formatDate(tx.date),
+          tx.account,
+          tx.category,
+          (tx.type === 'Income' ? '+' : '-') + tx.amount,
+          tx.type,
+          (tx.payment_type || 'TRANSFER').replace('_', ' '),
+          tx.notes || '',
+          tx.description || ''
+        ]
+        csvRows.push(row.join(','))
+      })
+      const csvContent = csvRows.join('\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = 'transactions.csv'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (error) {
+      console.error('CSV Export Error:', error)
+      alert('Error exporting CSV.')
+    }
   }
-
-  // Expand/Collapse row
   function toggleRowExpansion(id: string) {
     setExpandedRows(prev => {
       const newSet = new Set(prev)
@@ -440,18 +260,14 @@ export default function TransactionsPage() {
       return newSet
     })
   }
-
-  // CRUD: Edit & Delete
   function handleEdit(tx: Transaction) {
     setSelectedTx(tx)
     setEditModalOpen(true)
   }
-
   function handleDelete(tx: Transaction) {
     setSelectedTx(tx)
     setDeleteModalOpen(true)
   }
-
   async function confirmDelete() {
     if (!selectedTx) return
     try {
@@ -459,55 +275,47 @@ export default function TransactionsPage() {
       setDeleteModalOpen(false)
       setSelectedTx(null)
     } catch (error) {
-      console.error('Delete error:', error)
+      console.error('Delete Error:', error)
+      alert('Error deleting transaction.')
     }
   }
-
-  // INVOICE
   function openInvoice(tx: Transaction) {
     setSelectedTx(tx)
     setInvoiceModalOpen(true)
   }
-
-  // Render
+  const expenseByCategory = useMemo(() => {
+    const map = new Map<string, number>()
+    filteredTransactions.forEach(tx => {
+      if (tx.type === 'Expense') {
+        const cat = tx.category || 'Uncategorized'
+        map.set(cat, (map.get(cat) || 0) + tx.amount)
+      }
+    })
+    let result = Array.from(map.entries()).map(([category, amount]) => ({ category, amount }))
+    result.sort((a, b) => b.amount - a.amount)
+    if (result.length > 10) {
+      const top10 = result.slice(0, 10)
+      const others = result.slice(10)
+      const otherSum = others.reduce((sum, r) => sum + r.amount, 0)
+      top10.push({ category: 'Other', amount: otherSum })
+      result = top10
+    }
+    return result
+  }, [filteredTransactions])
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-
-      {/* FILTERS + CREATE BUTTON */}
       <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Filter Transactions</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">
-            Narrow down your transactions with filters
-          </CardDescription>
+          <CardDescription className="text-sm text-muted-foreground">Narrow down your transactions with filters</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
-            {/* Search */}
             <div className="relative w-full sm:w-[300px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search transactions..."
-                value={searchTerm}
-                onChange={e => {
-                  setSearchTerm(e.target.value)
-                  setCurrentPage(1)
-                }}
-                className="pl-8 h-9 text-sm"
-              />
+              <Input type="text" placeholder="Search transactions..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }} className="pl-8 h-9 text-sm" />
             </div>
-
-            {/* Date Range */}
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateRangeChange={range => {
-                setDateRange(range)
-                setCurrentPage(1)
-              }}
-            />
-
-            {/* Dropdown Filters */}
+            <DateRangePicker dateRange={dateRange} onDateRangeChange={range => { setDateRange(range); setCurrentPage(1) }} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
@@ -517,142 +325,55 @@ export default function TransactionsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[240px]">
-                {/* Type Filter */}
-                <DropdownMenuItem
-                  onClick={() => {
-                    setTypeFilter(null)
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
+                <DropdownMenuItem onClick={() => { setTypeFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
                   All Types {typeFilter === null && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setTypeFilter('Income')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
+                <DropdownMenuItem onClick={() => { setTypeFilter('Income'); setCurrentPage(1) }} className="justify-between text-sm">
                   Income {typeFilter === 'Income' && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setTypeFilter('Expense')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
+                <DropdownMenuItem onClick={() => { setTypeFilter('Expense'); setCurrentPage(1) }} className="justify-between text-sm">
                   Expense {typeFilter === 'Expense' && <span>✓</span>}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="h-px my-1 p-0" />
-
-                {/* Payment Filter */}
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPaymentFilter(null)
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
+                <DropdownMenuItem onClick={() => { setPaymentFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
                   All Payments {paymentFilter === null && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPaymentFilter('CASH')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
-                  <div className="flex items-center">
-                    <PaymentTypeIcon type="CASH" />
-                    Cash
-                  </div>
+                <DropdownMenuItem onClick={() => { setPaymentFilter('CASH'); setCurrentPage(1) }} className="justify-between text-sm">
+                  <div className="flex items-center"><PaymentTypeIcon type="CASH" />Cash</div>
                   {paymentFilter === 'CASH' && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPaymentFilter('CREDIT_CARD')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
-                  <div className="flex items-center">
-                    <PaymentTypeIcon type="CREDIT_CARD" />
-                    Credit Card
-                  </div>
+                <DropdownMenuItem onClick={() => { setPaymentFilter('CREDIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
+                  <div className="flex items-center"><PaymentTypeIcon type="CREDIT_CARD" />Credit Card</div>
                   {paymentFilter === 'CREDIT_CARD' && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPaymentFilter('DEBIT_CARD')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
-                  <div className="flex items-center">
-                    <PaymentTypeIcon type="DEBIT_CARD" />
-                    Debit Card
-                  </div>
+                <DropdownMenuItem onClick={() => { setPaymentFilter('DEBIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
+                  <div className="flex items-center"><PaymentTypeIcon type="DEBIT_CARD" />Debit Card</div>
                   {paymentFilter === 'DEBIT_CARD' && <span>✓</span>}
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPaymentFilter('TRANSFER')
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
-                  <div className="flex items-center">
-                    <PaymentTypeIcon type="TRANSFER" />
-                    Transfer
-                  </div>
+                <DropdownMenuItem onClick={() => { setPaymentFilter('TRANSFER'); setCurrentPage(1) }} className="justify-between text-sm">
+                  <div className="flex items-center"><PaymentTypeIcon type="TRANSFER" />Transfer</div>
                   {paymentFilter === 'TRANSFER' && <span>✓</span>}
                 </DropdownMenuItem>
                 <DropdownMenuItem className="h-px my-1 p-0" />
-
-                {/* Account Filter */}
-                <DropdownMenuItem
-                  onClick={() => {
-                    setAccountFilter(null)
-                    setCurrentPage(1)
-                  }}
-                  className="justify-between text-sm"
-                >
+                <DropdownMenuItem onClick={() => { setAccountFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
                   All Accounts {accountFilter === null && <span>✓</span>}
                 </DropdownMenuItem>
                 {allAccounts.map(acc => (
-                  <DropdownMenuItem
-                    key={acc}
-                    onClick={() => {
-                      setAccountFilter(acc)
-                      setCurrentPage(1)
-                    }}
-                    className="justify-between text-sm"
-                  >
+                  <DropdownMenuItem key={acc} onClick={() => { setAccountFilter(acc); setCurrentPage(1) }} className="justify-between text-sm">
                     {acc} {accountFilter === acc && <span>✓</span>}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Reset */}
-            <Button variant="outline" size="sm" onClick={resetFilters}>
-              Reset
-            </Button>
+            <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
           </div>
-
-          {/* Create & Export */}
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
-              <Download className="mr-1 h-4 w-4" />
-              Export CSV
+              <Download className="mr-1 h-4 w-4" />Export CSV
             </Button>
             <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
               <DialogTrigger asChild>
-                <Button variant="default" size="sm">
-                  + New Transaction
-                </Button>
+                <Button variant="default" size="sm">+ New Transaction</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
@@ -665,16 +386,12 @@ export default function TransactionsPage() {
         </CardContent>
       </Card>
 
-      {/* ACCOUNTS OVERVIEW */}
       {accountsSummary.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-xl font-bold mt-4">Accounts Overview</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {accountsSummary.map(acc => (
-              <Card
-                key={acc.account}
-                className="border bg-card/60 backdrop-blur-sm shadow-sm"
-              >
+              <Card key={acc.account} className="border bg-card/60 backdrop-blur-sm shadow-sm">
                 <CardHeader className="pb-1 px-4 pt-4">
                   <CardTitle className="text-lg truncate">{acc.account}</CardTitle>
                 </CardHeader>
@@ -682,11 +399,7 @@ export default function TransactionsPage() {
                   <p>Transactions: <span className="font-medium">{acc.count}</span></p>
                   <p>Income: <span className="font-medium">{formatCurrency(acc.totalIncome)}</span></p>
                   <p>Expense: <span className="font-medium">{formatCurrency(acc.totalExpense)}</span></p>
-                  <p>
-                    Net: <span className={acc.net >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                      {formatCurrency(acc.net)}
-                    </span>
-                  </p>
+                  <p>Net: <span className={acc.net >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>{formatCurrency(acc.net)}</span></p>
                 </CardContent>
               </Card>
             ))}
@@ -694,7 +407,6 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* SUMMARY */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-6">
         <div>
           <h2 className="text-2xl font-bold">Transactions Summary</h2>
@@ -712,7 +424,6 @@ export default function TransactionsPage() {
         </div>
       </div>
 
-      {/* TRANSACTIONS TABLE */}
       <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
         <CardHeader className="py-2 px-4 md:px-6">
           <CardTitle className="text-xl">Transactions</CardTitle>
@@ -722,47 +433,21 @@ export default function TransactionsPage() {
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead
-                    className="w-[90px] md:w-[120px] cursor-pointer text-left px-2 md:px-4"
-                    onClick={() => handleSort('date')}
-                  >
-                    <span className="flex items-center justify-start">
-                      Date {renderSortIcon('date')}
-                    </span>
+                  <TableHead className="w-[90px] md:w-[120px] cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('date')}>
+                    <span className="flex items-center justify-start">Date {renderSortIcon('date')}</span>
                   </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-left px-2 md:px-4"
-                    onClick={() => handleSort('account')}
-                  >
-                    <span className="flex items-center justify-start">
-                      Account {renderSortIcon('account')}
-                    </span>
+                  <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('account')}>
+                    <span className="flex items-center justify-start">Account {renderSortIcon('account')}</span>
                   </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-left px-2 md:px-4"
-                    onClick={() => handleSort('category')}
-                  >
-                    <span className="flex items-center justify-start">
-                      Category {renderSortIcon('category')}
-                    </span>
+                  <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('category')}>
+                    <span className="flex items-center justify-start">Category {renderSortIcon('category')}</span>
                   </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right px-2 md:px-4"
-                    onClick={() => handleSort('amount')}
-                  >
-                    <span className="flex items-center justify-end">
-                      Amount {renderSortIcon('amount')}
-                    </span>
+                  <TableHead className="cursor-pointer text-right px-2 md:px-4" onClick={() => handleSort('amount')}>
+                    <span className="flex items-center justify-end">Amount {renderSortIcon('amount')}</span>
                   </TableHead>
-                  <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">
-                    Type
-                  </TableHead>
-                  <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">
-                    Payment
-                  </TableHead>
-                  <TableHead className="text-right px-2 md:px-4">
-                    Actions
-                  </TableHead>
+                  <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Type</TableHead>
+                  <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Payment</TableHead>
+                  <TableHead className="text-right px-2 md:px-4">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -772,93 +457,35 @@ export default function TransactionsPage() {
                     return (
                       <React.Fragment key={tx.id}>
                         <TableRow className="group hover:bg-accent/30 transition-colors">
-                          <TableCell className="font-medium group-hover:text-primary px-2 md:px-4 text-sm md:text-base">
-                            {formatDate(tx.date)}
-                          </TableCell>
-                          <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                            {tx.account}
-                          </TableCell>
-                          <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                            {tx.category}
-                          </TableCell>
-                          <TableCell
-                            className={`text-right font-medium ${
-                              tx.type === 'Income' ? 'text-green-600' : 'text-red-600'
-                            } px-2 md:px-4 text-sm md:text-base`}
-                          >
+                          <TableCell className="font-medium group-hover:text-primary px-2 md:px-4 text-sm md:text-base">{formatDate(tx.date)}</TableCell>
+                          <TableCell className="px-2 md:px-4 text-sm md:text-base">{tx.account}</TableCell>
+                          <TableCell className="px-2 md:px-4 text-sm md:text-base">{tx.category}</TableCell>
+                          <TableCell className={`text-right font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'} px-2 md:px-4 text-sm md:text-base`}>
                             {tx.type === 'Income' ? '+' : '-'} {formatCurrency(tx.amount)}
                           </TableCell>
                           <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell text-sm md:text-base">
-                            <Badge
-                              variant={tx.type === 'Income' ? 'outline' : 'secondary'}
-                              className={`w-fit ml-auto px-2 py-0.5 text-xs md:text-xs ${
-                                tx.type === 'Income'
-                                  ? 'border-green-500/50 bg-green-500/10 text-green-600'
-                                  : 'border-red-500/50 bg-red-500/10 text-red-600'
-                              }`}
-                            >
+                            <Badge variant={tx.type === 'Income' ? 'outline' : 'secondary'} className={`w-fit ml-auto px-2 py-0.5 text-xs ${tx.type === 'Income' ? 'border-green-500/50 bg-green-500/10 text-green-600' : 'border-red-500/50 bg-red-500/10 text-red-600'}`}>
                               {tx.type}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell">
-                            <Badge
-                              variant="outline"
-                              className="flex items-center justify-center gap-1 w-fit ml-auto px-1 py-0.5 text-xs"
-                            >
+                            <Badge variant="outline" className="flex items-center justify-center gap-1 w-fit ml-auto px-1 py-0.5 text-xs">
                               <PaymentTypeIcon type={tx.payment_type || 'TRANSFER'} />
-                              <span className="hidden sm:inline">
-                                {(tx.payment_type || 'TRANSFER').replace('_', ' ')}
-                              </span>
-                              <span className="sm:hidden text-[0.7rem]">
-                                ({(tx.payment_type || 'TRANSFER').charAt(0)})
-                              </span>
+                              <span className="hidden sm:inline">{(tx.payment_type || 'TRANSFER').replace('_', ' ')}</span>
+                              <span className="sm:hidden text-[0.7rem]">({(tx.payment_type || 'TRANSFER').charAt(0)})</span>
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right px-2 md:px-4 space-x-2">
-                            {/* Expand */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleRowExpansion(tx.id)}
-                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
-                            >
-                              {isExpanded ? (
-                                <ChevronUp className="h-4 w-4" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4" />
-                              )}
+                            <Button variant="ghost" size="sm" onClick={() => toggleRowExpansion(tx.id)} className="p-0 h-auto w-6 inline-flex items-center justify-center">
+                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
-                            {/* Edit */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedTx(tx)
-                                setEditModalOpen(true)
-                              }}
-                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
-                              title="Edit Transaction"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => { setSelectedTx(tx); setEditModalOpen(true) }} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Edit Transaction">
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            {/* Delete */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(tx)}
-                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
-                              title="Delete Transaction"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Delete Transaction">
                               <Trash className="h-4 w-4 text-destructive" />
                             </Button>
-                            {/* Invoice */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openInvoice(tx)}
-                              className="p-0 h-auto w-6 inline-flex items-center justify-center"
-                              title="View Invoice"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => openInvoice(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="View Invoice">
                               <FileText className="h-4 w-4" />
                             </Button>
                           </TableCell>
@@ -866,7 +493,7 @@ export default function TransactionsPage() {
                         {isExpanded && (
                           <TableRow className="bg-muted/20">
                             <TableCell colSpan={7} className="p-4 text-sm">
-                              <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+                              <div className="flex flex-col md:flex-row gap-4">
                                 <div className="flex-1">
                                   <h4 className="font-semibold">Notes:</h4>
                                   <p>{tx.notes || '-'}</p>
@@ -884,9 +511,7 @@ export default function TransactionsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-sm md:text-base">
-                      No transactions found.
-                    </TableCell>
+                    <TableCell colSpan={7} className="h-24 text-center text-sm">No transactions found.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -894,76 +519,45 @@ export default function TransactionsPage() {
           </div>
           {sortedTransactions.length > pageSize && (
             <div className="flex justify-center sm:justify-end items-center mt-2 gap-2 p-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                Prev
-              </Button>
-              <span className="text-sm md:text-base">
-                {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Prev</Button>
+              <span className="text-sm">{currentPage} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* EDIT TRANSACTION MODAL */}
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Transaction</DialogTitle>
           </DialogHeader>
           {selectedTx && (
-            <TransactionForm
-              transaction={selectedTx}
-              onSuccess={() => {
-                setEditModalOpen(false)
-                setSelectedTx(null)
-              }}
-            />
+            <TransactionForm transaction={selectedTx} onSuccess={() => { setEditModalOpen(false); setSelectedTx(null) }} />
           )}
         </DialogContent>
       </Dialog>
 
-      {/* DELETE CONFIRMATION MODAL */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Transaction</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Are you sure you want to delete this transaction? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="space-x-2">
-            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDelete}>
-              Delete
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* INVOICE MODAL */}
       <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Invoice</DialogTitle>
           </DialogHeader>
           {selectedTx && (
-            <div className="p-4 text-sm space-y-3 print:block">
+            <div className="p-4 text-sm space-y-3">
               <div className="border-b pb-2 mb-2">
                 <h2 className="text-lg font-semibold">Transaction ID: {selectedTx.id}</h2>
               </div>
@@ -989,9 +583,7 @@ export default function TransactionsPage() {
               </div>
               <div className="flex justify-between">
                 <p className="font-medium">Amount:</p>
-                <p>
-                  {(selectedTx.type === 'Income' ? '+' : '-') + formatCurrency(selectedTx.amount)}
-                </p>
+                <p>{(selectedTx.type === 'Income' ? '+' : '-') + formatCurrency(selectedTx.amount)}</p>
               </div>
               <div className="flex justify-between">
                 <p className="font-medium">Notes:</p>
@@ -1001,13 +593,35 @@ export default function TransactionsPage() {
                 <p className="font-medium">Description:</p>
                 <p>{selectedTx.description || '-'}</p>
               </div>
-              <Button variant="outline" className="mt-4 w-full" onClick={() => window.print()}>
-                Save as PDF / Print
-              </Button>
+              <Button variant="outline" className="mt-4 w-full" onClick={() => window.print()}>Save as PDF / Print</Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
+        <CardHeader className="py-2 px-4 md:px-6">
+          <CardTitle className="text-xl">Expense Distribution</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">Where your expenses are going by category</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {expenseByCategory.length === 0 ? (
+            <p className="text-center text-sm">No expenses found.</p>
+          ) : (
+            <div style={{ width: '100%', height: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={expenseByCategory} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" />
+                  <YAxis />
+                  <Tooltip formatter={(value: number) => [formatCurrency(value), 'Expense']} />
+                  <Bar dataKey="amount" fill="#FF595E" name="Expense" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
