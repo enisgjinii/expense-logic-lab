@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
@@ -9,7 +8,7 @@ import {
   LayoutDashboard, 
   Receipt, 
   Tag, 
-  FileImport, 
+  FileUp, 
   PieChart, 
   Settings, 
   User, 
@@ -32,7 +31,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
   
-  // If the user is not logged in and not on the auth page, redirect to auth
   React.useEffect(() => {
     if (!user && location.pathname !== '/auth') {
       navigate('/auth');
@@ -49,7 +47,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/categories', label: t('common.categories'), icon: <Tag size={20} /> },
     { path: '/budget', label: t('common.budget'), icon: <BarChart3 size={20} /> },
     { path: '/reports', label: t('common.reports'), icon: <PieChart size={20} /> },
-    { path: '/import', label: t('common.import'), icon: <FileImport size={20} /> },
+    { path: '/import', label: t('common.import'), icon: <FileUp size={20} /> },
     { path: '/settings', label: t('common.settings'), icon: <Settings size={20} /> },
     { path: '/profile', label: t('common.profile'), icon: <User size={20} /> }
   ];
@@ -67,14 +65,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setIsMenuOpen(false);
   };
 
-  // If we're on the auth page, don't show the layout
   if (location.pathname === '/auth') {
     return <>{children}</>;
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Mobile menu button */}
       {isMobile && (
         <Button 
           variant="ghost" 
@@ -86,7 +82,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </Button>
       )}
 
-      {/* Sidebar (full on desktop, hidden/overlay on mobile) */}
       <aside 
         className={`
           bg-background border-r border-border
@@ -160,12 +155,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         {children}
       </main>
 
-      {/* Mobile overlay background */}
       {isMobile && isMenuOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-30"
