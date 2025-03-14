@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react'
 import { useFinance } from '@/contexts/FinanceContext'
 import { Transaction } from '@/types/finance'
@@ -49,8 +48,12 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
-      if (transaction) await updateTransaction({ ...transaction, ...formData })
-      else await addTransaction({ ...formData })
+      if (transaction) {
+        await updateTransaction({ ...transaction, ...formData })
+      } else {
+        const newId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9)
+        await addTransaction({ id: newId, ...formData })
+      }
       if (onSuccess) onSuccess()
     } catch (error) {
       console.error('Submit Error:', error)
