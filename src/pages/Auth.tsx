@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useFinance } from '@/contexts/FinanceContext';
@@ -22,6 +23,8 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/firebase';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const Auth: React.FC = () => {
   const { user, signIn, signUp, isAuthLoading } = useFinance();
@@ -36,6 +39,7 @@ const Auth: React.FC = () => {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   // Redirect to home if already logged in and auth is not loading
   if (user && !isAuthLoading) {
@@ -136,7 +140,7 @@ const Auth: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <CreditCard className="h-16 w-16 text-primary mb-4 animate-pulse" />
         <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-muted-foreground">Loading your account...</p>
+        <p className="mt-4 text-muted-foreground">{t('dashboard.refreshData')}...</p>
       </div>
     );
   }
@@ -149,7 +153,10 @@ const Auth: React.FC = () => {
             <CreditCard className="h-12 w-12 text-primary" />
           </div>
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">Finance Tracker</h1>
-          <p className="text-muted-foreground mt-2">Secure. Simple. Smart money management.</p>
+          <p className="text-muted-foreground mt-2">{t('common.welcome')}</p>
+          <div className="mt-4">
+            <LanguageSwitcher />
+          </div>
         </div>
 
         {error && (
@@ -161,23 +168,23 @@ const Auth: React.FC = () => {
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6 rounded-lg">
-            <TabsTrigger value="login" className="rounded-l-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Login</TabsTrigger>
-            <TabsTrigger value="signup" className="rounded-r-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Sign Up</TabsTrigger>
+            <TabsTrigger value="login" className="rounded-l-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('common.login')}</TabsTrigger>
+            <TabsTrigger value="signup" className="rounded-r-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">{t('common.signup')}</TabsTrigger>
           </TabsList>
 
           {/* Login Tab */}
           <TabsContent value="login" className="animate-in fade-in-50 slide-in-from-left-5">
             <Card className="border-primary/20">
               <CardHeader>
-                <CardTitle className="text-2xl">Welcome Back</CardTitle>
+                <CardTitle className="text-2xl">{t('auth.welcomeBack')}</CardTitle>
                 <CardDescription>
-                  Sign in to access your personalized financial dashboard
+                  {t('auth.signInDesc')}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleLogin}>
                 <CardContent className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-sm font-medium">Email Address</Label>
+                    <Label htmlFor="login-email" className="text-sm font-medium">{t('auth.email')}</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -192,8 +199,8 @@ const Auth: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <Label htmlFor="login-password" className="text-sm font-medium">Password</Label>
-                      <a href="#" className="text-xs text-primary hover:underline">Forgot password?</a>
+                      <Label htmlFor="login-password" className="text-sm font-medium">{t('auth.password')}</Label>
+                      <a href="#" className="text-xs text-primary hover:underline">{t('auth.forgotPassword')}</a>
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -231,12 +238,12 @@ const Auth: React.FC = () => {
                     ) : (
                       <LogIn className="mr-2 h-5 w-5" />
                     )}
-                    Sign In
+                    {t('auth.signIn')}
                   </Button>
 
                   <div className="flex items-center my-6 w-full">
                     <Separator className="flex-1" />
-                    <span className="mx-4 text-xs text-muted-foreground">OR</span>
+                    <span className="mx-4 text-xs text-muted-foreground">{t('auth.or')}</span>
                     <Separator className="flex-1" />
                   </div>
 
@@ -255,7 +262,7 @@ const Auth: React.FC = () => {
                         <path d="M12 22C14.583 22 16.93 21.0115 18.7045 19.404L15.6095 16.785C14.5718 17.5742 13.3038 18.001 12 18C9.39903 18 7.19053 16.3415 6.35853 14.027L3.09753 16.5395C4.75253 19.778 8.11353 22 12 22Z" fill="#4CAF50" />
                         <path d="M21.8055 10.0415H21V10H12V14H17.6515C17.2571 15.1082 16.5467 16.0766 15.608 16.7855L15.6095 16.7845L18.7045 19.4035C18.4855 19.6025 22 17 22 12C22 11.3295 21.931 10.675 21.8055 10.0415Z" fill="#1976D2" />
                       </svg>)}
-                    Continue with Google
+                    {t('auth.continueWithGoogle')}
                   </Button>
                 </CardFooter>
               </form>
@@ -266,15 +273,15 @@ const Auth: React.FC = () => {
           <TabsContent value="signup" className="animate-in fade-in-50 slide-in-from-right-5">
             <Card className="border-primary/20">
               <CardHeader>
-                <CardTitle className="text-2xl">Create an Account</CardTitle>
+                <CardTitle className="text-2xl">{t('auth.createAccount')}</CardTitle>
                 <CardDescription>
-                  Join thousands of users managing their finances smarter
+                  {t('auth.joinDesc')}
                 </CardDescription>
               </CardHeader>
               <form onSubmit={handleSignup}>
                 <CardContent className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email" className="text-sm font-medium">Email Address</Label>
+                    <Label htmlFor="signup-email" className="text-sm font-medium">{t('auth.email')}</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -288,7 +295,7 @@ const Auth: React.FC = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password" className="text-sm font-medium">Password</Label>
+                    <Label htmlFor="signup-password" className="text-sm font-medium">{t('auth.password')}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -313,11 +320,11 @@ const Auth: React.FC = () => {
                       </button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Password must be at least 8 characters long
+                      {t('auth.passwordReq')}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-confirm-password" className="text-sm font-medium">Confirm Password</Label>
+                    <Label htmlFor="signup-confirm-password" className="text-sm font-medium">{t('auth.confirmPassword')}</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -354,12 +361,12 @@ const Auth: React.FC = () => {
                     ) : (
                       <UserPlus className="mr-2 h-5 w-5" />
                     )}
-                    Create Account
+                    {t('auth.createAccountBtn')}
                   </Button>
 
                   <div className="flex items-center my-6 w-full">
                     <Separator className="flex-1" />
-                    <span className="mx-4 text-xs text-muted-foreground">OR</span>
+                    <span className="mx-4 text-xs text-muted-foreground">{t('auth.or')}</span>
                     <Separator className="flex-1" />
                   </div>
 
@@ -378,7 +385,7 @@ const Auth: React.FC = () => {
                         <path d="M12 22C14.583 22 16.93 21.0115 18.7045 19.404L15.6095 16.785C14.5718 17.5742 13.3038 18.001 12 18C9.39903 18 7.19053 16.3415 6.35853 14.027L3.09753 16.5395C4.75253 19.778 8.11353 22 12 22Z" fill="#4CAF50" />
                         <path d="M21.8055 10.0415H21V10H12V14H17.6515C17.2571 15.1082 16.5467 16.0766 15.608 16.7855L15.6095 16.7845L18.7045 19.4035C18.4855 19.6025 22 17 22 12C22 11.3295 21.931 10.675 21.8055 10.0415Z" fill="#1976D2" />
                       </svg>)}
-                    Sign up with Google
+                    {t('auth.signUpGoogle')}
                   </Button>
                 </CardFooter>
               </form>
@@ -387,11 +394,11 @@ const Auth: React.FC = () => {
         </Tabs>
 
         <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>By continuing, you agree to our</p>
+          <p>{t('auth.termsAgree')}</p>
           <div className="space-x-1 mt-1">
-            <a href="#" className="text-primary hover:underline">Terms of Service</a>
-            <span>and</span>
-            <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+            <a href="#" className="text-primary hover:underline">{t('auth.termsService')}</a>
+            <span>{t('auth.and')}</span>
+            <a href="#" className="text-primary hover:underline">{t('auth.privacyPolicy')}</a>
           </div>
         </div>
       </div>

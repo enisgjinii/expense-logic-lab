@@ -1,14 +1,28 @@
 
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import App from './App'
 import './index.css'
+import { FinanceProvider } from './contexts/FinanceContext'
+import { ThemeProvider } from './contexts/useThemeManager'
+import { Toaster } from './components/ui/toaster'
+import { Toaster as SonnerToaster } from 'sonner'
+import { LanguageProvider } from './contexts/LanguageContext'
+import './i18n/i18n'
 
-// Inject the Lovable script tag if it doesn't exist yet
-if (!document.querySelector('script[src="https://cdn.gpteng.co/gptengineer.js"]')) {
-  const script = document.createElement('script');
-  script.src = 'https://cdn.gpteng.co/gptengineer.js';
-  script.type = 'module';
-  document.head.appendChild(script);
-}
-
-createRoot(document.getElementById("root")!).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <ThemeProvider>
+        <LanguageProvider>
+          <FinanceProvider>
+            <App />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </FinanceProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
+)

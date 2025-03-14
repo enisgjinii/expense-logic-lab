@@ -5,6 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
 import { getInsights } from '@/utils/dashboard-utils';
+import { useTranslation } from 'react-i18next';
 
 interface DashboardPanel {
   id: string;
@@ -18,6 +19,7 @@ const Dashboard = () => {
   const [timeRange, setTimeRange] = useState('month');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   const [panels, setPanels] = useState<DashboardPanel[]>(() => {
     const savedLayout = localStorage.getItem('dashboardLayout');
@@ -47,7 +49,7 @@ const Dashboard = () => {
     await refreshData();
     setTimeout(() => {
       setIsRefreshing(false);
-      toast({ title: "Dashboard Refreshed", description: "Latest data has been loaded" });
+      toast({ title: t('dashboard.refreshData'), description: t('dashboard.noTransactions') });
     }, 800);
   };
 
@@ -63,7 +65,7 @@ const Dashboard = () => {
       <div className="h-full w-full flex items-center justify-center">
         <div className="relative">
           <div className="h-16 w-16 rounded-full border-4 border-t-blue-500 border-b-blue-700 border-l-blue-600 border-r-blue-400 animate-spin"></div>
-          <p className="mt-4 text-muted-foreground">Loading financial data...</p>
+          <p className="mt-4 text-muted-foreground">{t('dashboard.refreshData')}...</p>
         </div>
       </div>
     );
@@ -74,7 +76,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 pb-10 animate-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h1 className="text-2xl font-bold mb-2 sm:mb-0">Financial Dashboard</h1>
+        <h1 className="text-2xl font-bold mb-2 sm:mb-0">{t('dashboard.title')}</h1>
         <DashboardFilters 
           timeRange={timeRange}
           setTimeRange={setTimeRange}
