@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { 
@@ -22,15 +22,20 @@ import {
   Sun,
   Laptop,
   HelpCircle,
-  Tag,
-  Globe
+  Tag
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/components/ui/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import { Language, languages } from '@/locales';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -77,40 +82,39 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, themeMode, setThemeMode } = useFinance();
-  const { language, setLanguage, t } = useLanguage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const navigationItems = [
     {
       icon: <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.dashboard'),
+      label: "Dashboard",
       to: "/",
     },
     {
       icon: <ListFilter className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.transactions'),
+      label: "Transactions",
       to: "/transactions",
       count: 12,
     },
     {
       icon: <PieChart className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.budget'),
+      label: "Budget",
       to: "/budget",
     },
     {
       icon: <LineChart className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.reports'),
+      label: "Reports",
       to: "/reports",
     },
     {
       icon: <Tag className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.categories'),
+      label: "Categories",
       to: "/categories",
     },
     {
       icon: <Upload className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.import'),
+      label: "Import",
       to: "/import",
     },
   ];
@@ -118,12 +122,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const bottomItems = [
     {
       icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.profile'),
+      label: "Profile",
       to: "/profile",
     },
     {
       icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: t('navigation.settings'),
+      label: "Settings",
       to: "/settings",
     },
   ];
@@ -132,15 +136,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     try {
       await logout();
       toast({
-        title: t('auth.logoutSuccess'),
-        description: t('auth.logoutSuccessDescription'),
+        title: "Logged out successfully",
+        description: "You have been logged out of your account.",
       });
       navigate('/auth');
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: t('auth.logoutFailed'),
-        description: t('auth.logoutError'),
+        title: "Logout failed",
+        description: "There was an error logging out. Please try again.",
         variant: "destructive",
       });
     }
@@ -157,55 +161,38 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setIsCollapsed(savedState === 'true');
     }
     
+    // Close mobile menu when route changes
     setIsMobileMenuOpen(false);
     
+    // Auto-collapse sidebar on small screens
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsCollapsed(true);
       }
     };
     
-    handleResize();
+    handleResize(); // Run once on initial load
     window.addEventListener('resize', handleResize);
     
     return () => window.removeEventListener('resize', handleResize);
   }, [location.pathname]);
 
-  const LanguageSelector = () => (
+  const MobileThemeSwitcher = () => (
     <>
       <DropdownMenuItem disabled className="opacity-70 text-xs sm:text-sm">
-        {t('settings.language')}
-      </DropdownMenuItem>
-      {Object.entries(languages).map(([code, lang]) => (
-        <DropdownMenuItem 
-          key={code}
-          onClick={() => setLanguage(code as Language)} 
-          className="text-xs sm:text-sm"
-        >
-          <Globe className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-          {lang.nativeName}
-          {language === code && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
-        </DropdownMenuItem>
-      ))}
-    </>
-  );
-
-  const ThemeSwitcher = () => (
-    <>
-      <DropdownMenuItem disabled className="opacity-70 text-xs sm:text-sm">
-        {t('settings.theme')}
+        Theme
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
         <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        {t('settings.light')} {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        Light {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
         <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        {t('settings.dark')} {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        Dark {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
         <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        {t('settings.system')} {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        System {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
     </>
   );
@@ -217,7 +204,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex justify-between items-center w-full">
             <div className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
-              <h1 className="font-semibold text-sm">{t('general.appName')}</h1>
+              <h1 className="font-semibold text-sm">Finance Tracker</h1>
             </div>
             
             <div className="flex items-center gap-2">
@@ -241,21 +228,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate('/profile')} className="text-xs sm:text-sm">
                       <User className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{t('navigation.profile')}</span>
+                      <span>Profile</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/settings')} className="text-xs sm:text-sm">
                       <Settings className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{t('navigation.settings')}</span>
+                      <span>Settings</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="text-xs sm:text-sm">
                       <LogOut className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{t('navigation.logout')}</span>
+                      <span>Logout</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <ThemeSwitcher />
-                    <DropdownMenuSeparator />
-                    <LanguageSelector />
+                    <MobileThemeSwitcher />
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -313,7 +298,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span>{t('navigation.logout')}</span>
+                    <span>Logout</span>
                   </Button>
                 </>
               ) : (
@@ -323,13 +308,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     className="w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal mt-4 border-t pt-4 text-sm"
                   >
                     <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span>{t('navigation.login')}</span>
+                    <span>Login / Sign Up</span>
                   </Button>
                 </Link>
               )}
               
               <div className="mt-6 p-2 bg-accent/50 rounded-lg">
-                <p className="text-xs font-medium mb-2">{t('settings.language')}</p>
+                <p className="text-xs font-medium mb-2">Theme</p>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
@@ -338,7 +323,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("light")}
                   >
                     <Sun className="h-3 w-3 mr-1" />
-                    {t('settings.light')}
+                    Light
                   </Button>
                   <Button 
                     variant="outline" 
@@ -347,7 +332,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("dark")}
                   >
                     <Moon className="h-3 w-3 mr-1" />
-                    {t('settings.dark')}
+                    Dark
                   </Button>
                   <Button 
                     variant="outline" 
@@ -356,7 +341,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("system")}
                   >
                     <Laptop className="h-3 w-3 mr-1" />
-                    {t('settings.system')}
+                    System
                   </Button>
                 </div>
               </div>
@@ -378,7 +363,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <>
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <h1 className="font-semibold text-base sm:text-lg">{t('general.appName')}</h1>
+                  <h1 className="font-semibold text-base sm:text-lg">Finance App</h1>
                 </div>
               </>
             )}
@@ -429,7 +414,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-                {!isCollapsed && <span>{t('navigation.logout')}</span>}
+                {!isCollapsed && <span>Logout</span>}
               </Button>
             ) : (
               <Link to="/auth">
@@ -441,31 +426,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   )}
                 >
                   <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                  {!isCollapsed && <span>{t('navigation.login')}</span>}
+                  {!isCollapsed && <span>Login</span>}
                 </Button>
               </Link>
             )}
             
             {!isCollapsed && (
               <div className="border-t mt-4 mb-4 pt-4 px-2">
-                <p className="mb-2 text-xs sm:text-sm font-medium">{t('settings.language')}</p>
-                <Select 
-                  value={language} 
-                  onValueChange={(value: Language) => setLanguage(value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={t('settings.selectLanguage')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(languages).map(([code, lang]) => (
-                      <SelectItem key={code} value={code as Language}>
-                        <div className="flex items-center gap-2">
-                          <span>{lang.nativeName}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <p className="mb-2 text-xs sm:text-sm font-medium">Theme</p>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "light" && "bg-accent text-accent-foreground")}
+                    onClick={() => setThemeMode("light")}
+                  >
+                    <Sun className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "dark" && "bg-accent text-accent-foreground")}
+                    onClick={() => setThemeMode("dark")}
+                  >
+                    <Moon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className={cn("flex-1 h-7 w-7 sm:h-8 sm:w-8 p-0", themeMode === "system" && "bg-accent text-accent-foreground")}
+                    onClick={() => setThemeMode("system")}
+                  >
+                    <Laptop className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
             
@@ -477,20 +471,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     size="icon" 
                     className="w-full justify-center p-2 sm:p-3 mt-4 h-8 w-8 sm:h-10 sm:w-10"
                   >
-                    <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
+                    {themeMode === 'light' ? (
+                      <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
+                    ) : themeMode === 'dark' ? (
+                      <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    ) : (
+                      <Laptop className="h-4 w-4 sm:h-5 sm:w-5" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="right">
-                  {Object.entries(languages).map(([code, lang]) => (
-                    <DropdownMenuItem 
-                      key={code}
-                      onClick={() => setLanguage(code as Language)}
-                      className="text-xs sm:text-sm"
-                    >
-                      <span>{lang.nativeName}</span>
-                      {language === code && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
-                    </DropdownMenuItem>
-                  ))}
+                  <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
+                    <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Light</span>
+                    {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
+                    <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Dark</span>
+                    {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
+                    <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>System</span>
+                    {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
