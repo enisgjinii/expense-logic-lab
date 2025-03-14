@@ -1,21 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { toast } from '@/components/ui/use-toast'
 import { useFinance } from '@/contexts/FinanceContext'
@@ -23,21 +11,8 @@ import { Budget, Transaction } from '@/types/finance'
 import { formatCurrency, getCategoryColor } from '@/utils/finance-utils'
 import { v4 as uuidv4 } from 'uuid'
 import {
-  Plus,
-  Pencil,
-  Trash,
-  X,
-  Check,
-  DollarSign,
-  CalendarDays,
-  Clock,
-  AlertCircle,
-  Search,
-  Filter,
-  RefreshCw,
-  Download,
-  BarChart4,
-  PieChart
+  Plus, Pencil, Trash, X, Check, DollarSign, CalendarDays, Clock,
+  AlertCircle, Search, Filter, RefreshCw, Download, BarChart4, PieChart
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -46,62 +21,36 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle
 } from '@/components/ui/dialog'
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious
+  Pagination, PaginationContent, PaginationEllipsis,
+  PaginationItem, PaginationLink, PaginationNext, PaginationPrevious
 } from '@/components/ui/pagination'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Doughnut, Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js'
 import { motion } from 'framer-motion'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
 
-// Extend the Budget type to support custom cycles.
 type ExtendedBudget = Omit<Budget, 'id'> & {
-  cycleStart?: string // ISO date string for custom cycle start
-  cycleLength?: number // in days (only for custom budgets)
+  cycleStart?: string
+  cycleLength?: number
 }
 
 const BudgetPage: React.FC = () => {
-  const {
-    budgets,
-    budgetSummaries,
-    transactions,
-    addBudget,
-    deleteBudget,
-    updateBudget
-  } = useFinance()
-
-  // New budget state now includes custom fields.
+  const { budgets, budgetSummaries, transactions, addBudget, deleteBudget, updateBudget } = useFinance()
   const [newBudget, setNewBudget] = useState<ExtendedBudget>({
-    category: '',
-    name: '',
-    amount: 0,
-    period: 'monthly', // options: weekly, bi-weekly, monthly, yearly, custom
-    color: '#6366f1'
-    // cycleStart and cycleLength will be defined if period === 'custom'
+    category: '', name: '', amount: 0, period: 'monthly', color: '#6366f1'
   })
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterPeriod, setFilterPeriod] = useState<string>('all')
+  const [filterPeriod, setFilterPeriod] = useState('all')
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date()
   })
-  const [isLoading, setIsLoading] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -113,97 +62,61 @@ const BudgetPage: React.FC = () => {
     to: new Date()
   })
   const [dialogCurrentPage, setDialogCurrentPage] = useState(1)
-
   const itemsPerPage = 6
   const dialogItemsPerPage = 5
-
-  const uniqueCategories = Array.from(
-    new Set(transactions.filter(t => t.type === 'Expense').map(t => t.category))
-  ).sort()
-
+  const uniqueCategories = Array.from(new Set(transactions.filter(t => t.type === 'Expense').map(t => t.category))).sort()
   const availableCategories = uniqueCategories.filter(
-    category =>
-      !budgets.some(budget => budget.category === category) ||
-      (editingBudgetId && budgets.find(b => b.id === editingBudgetId)?.category === category)
+    c =>
+      !budgets.some(b => b.category === c) ||
+      (editingBudgetId && budgets.find(b => b.id === editingBudgetId)?.category === c)
   )
-
-  const filteredBudgetSummaries = budgetSummaries.filter(summary => {
-    const nameMatch = summary.budget.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const catMatch = summary.budget.category.toLowerCase().includes(searchQuery.toLowerCase())
-    const periodMatch = filterPeriod === 'all' || summary.budget.period === filterPeriod
-    return (nameMatch || catMatch) && periodMatch
+  const filteredBudgetSummaries = budgetSummaries.filter(s => {
+    const n = s.budget.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const c = s.budget.category.toLowerCase().includes(searchQuery.toLowerCase())
+    const p = filterPeriod === 'all' || s.budget.period === filterPeriod
+    return (n || c) && p
   })
-
   const totalPages = Math.ceil(filteredBudgetSummaries.length / itemsPerPage)
-  const currentItems = filteredBudgetSummaries.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  )
+  const currentItems = filteredBudgetSummaries.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   useEffect(() => {
-    if (filteredBudgetSummaries.length > 0 && currentPage > totalPages) {
-      setCurrentPage(1)
-    }
+    if (filteredBudgetSummaries.length > 0 && currentPage > totalPages) setCurrentPage(1)
   }, [filteredBudgetSummaries.length, currentPage, totalPages])
-
-  useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [searchQuery, filterPeriod, currentPage])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    // For cycleLength, parse as number.
-    setNewBudget(prev => ({
-      ...prev,
+    setNewBudget(p => ({
+      ...p,
       [name]: name === 'amount' || name === 'cycleLength' ? parseFloat(value) || 0 : value
     }))
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    // When changing period, if user selects "custom", reset custom fields.
-    setNewBudget(prev => ({
-      ...prev,
+    setNewBudget(p => ({
+      ...p,
       [name]: value,
-      color: name === 'category' ? getCategoryColor(value) : prev.color,
+      color: name === 'category' ? getCategoryColor(value) : p.color,
       ...(name === 'period' && value === 'custom' ? { cycleStart: '', cycleLength: 0 } : {})
     }))
   }
 
   const handleColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewBudget(prev => ({
-      ...prev,
-      color: e.target.value
-    }))
+    setNewBudget(p => ({ ...p, color: e.target.value }))
   }
 
   const validateBudget = () => {
     if (!newBudget.category) {
-      toast({
-        title: 'Error',
-        description: 'Please select a category',
-        variant: 'destructive'
-      })
+      toast({ title: 'Error', description: 'Please select a category', variant: 'destructive' })
       return false
     }
     if (!newBudget.name) {
-      toast({
-        title: 'Error',
-        description: 'Please provide a budget name',
-        variant: 'destructive'
-      })
+      toast({ title: 'Error', description: 'Please provide a budget name', variant: 'destructive' })
       return false
     }
     if (newBudget.amount <= 0) {
-      toast({
-        title: 'Error',
-        description: 'Budget amount must be greater than zero',
-        variant: 'destructive'
-      })
+      toast({ title: 'Error', description: 'Budget amount must be greater than zero', variant: 'destructive' })
       return false
     }
-    // If custom, require valid cycle start and length.
     if (newBudget.period === 'custom') {
       if (!newBudget.cycleStart) {
         toast({
@@ -214,11 +127,7 @@ const BudgetPage: React.FC = () => {
         return false
       }
       if (!newBudget.cycleLength || newBudget.cycleLength <= 0) {
-        toast({
-          title: 'Error',
-          description: 'Cycle length must be greater than zero',
-          variant: 'destructive'
-        })
+        toast({ title: 'Error', description: 'Cycle length must be greater than zero', variant: 'destructive' })
         return false
       }
     }
@@ -230,20 +139,19 @@ const BudgetPage: React.FC = () => {
     if (!validateBudget()) return
     if (editingBudgetId) {
       try {
-        const updatedBudget: Budget = {
+        const updated: Budget = {
           id: editingBudgetId,
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
           period: newBudget.period,
           color: newBudget.color,
-          // Include custom fields if period is custom.
           ...(newBudget.period === 'custom' && {
             cycleStart: newBudget.cycleStart,
             cycleLength: newBudget.cycleLength
           })
         }
-        updateBudget(updatedBudget)
+        updateBudget(updated)
         toast({
           title: 'Budget Updated',
           description: `Budget for ${newBudget.name || newBudget.category} has been updated`
@@ -252,15 +160,16 @@ const BudgetPage: React.FC = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to update budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          description: `Failed to update budget: ${error instanceof Error ? error.message : 'Unknown error'
+            }`,
           variant: 'destructive'
         })
       }
     } else {
       try {
-        const newId = uuidv4()
-        const budgetData: Budget = {
-          id: newId,
+        const id = uuidv4()
+        const b: Budget = {
+          id,
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
@@ -271,7 +180,7 @@ const BudgetPage: React.FC = () => {
             cycleLength: newBudget.cycleLength
           })
         }
-        addBudget(budgetData)
+        addBudget(b)
         toast({
           title: 'Budget Created',
           description: `Budget for ${newBudget.name || newBudget.category} has been created`
@@ -280,7 +189,8 @@ const BudgetPage: React.FC = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to create budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          description: `Failed to create budget: ${error instanceof Error ? error.message : 'Unknown error'
+            }`,
           variant: 'destructive'
         })
       }
@@ -288,29 +198,22 @@ const BudgetPage: React.FC = () => {
   }
 
   const resetForm = () => {
-    setNewBudget({
-      category: '',
-      name: '',
-      amount: 0,
-      period: 'monthly',
-      color: '#6366f1'
-    })
+    setNewBudget({ category: '', name: '', amount: 0, period: 'monthly', color: '#6366f1' })
     setEditingBudgetId(null)
     setCreateDialogOpen(false)
   }
 
-  const handleEdit = (budget: Budget, e: React.MouseEvent) => {
+  const handleEdit = (b: Budget, e: React.MouseEvent) => {
     e.stopPropagation()
-    setEditingBudgetId(budget.id)
+    setEditingBudgetId(b.id)
     setNewBudget({
-      category: budget.category,
-      name: budget.name || budget.category,
-      amount: budget.amount,
-      period: budget.period,
-      color: budget.color || getCategoryColor(budget.category),
-      // If the budget is custom, set custom fields.
-      cycleStart: (budget as any).cycleStart,
-      cycleLength: (budget as any).cycleLength
+      category: b.category,
+      name: b.name || b.category,
+      amount: b.amount,
+      period: b.period,
+      color: b.color || getCategoryColor(b.category),
+      cycleStart: (b as any).cycleStart,
+      cycleLength: (b as any).cycleLength
     })
     setCreateDialogOpen(true)
   }
@@ -324,14 +227,12 @@ const BudgetPage: React.FC = () => {
     if (confirmDelete) {
       try {
         deleteBudget(confirmDelete)
-        toast({
-          title: 'Budget Deleted',
-          description: 'The budget has been removed'
-        })
+        toast({ title: 'Budget Deleted', description: 'The budget has been removed' })
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to delete budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          description: `Failed to delete budget: ${error instanceof Error ? error.message : 'Unknown error'
+            }`,
           variant: 'destructive'
         })
       } finally {
@@ -352,17 +253,17 @@ const BudgetPage: React.FC = () => {
 
   const exportBudgets = () => {
     try {
-      const data = filteredBudgetSummaries.map(summary => ({
-        name: summary.budget.name,
-        category: summary.budget.category,
-        period: summary.budget.period,
-        amount: summary.budget.amount,
-        spent: summary.spent,
-        remaining: summary.remaining,
-        percentage: summary.percentage
+      const data = filteredBudgetSummaries.map(s => ({
+        name: s.budget.name,
+        category: s.budget.category,
+        period: s.budget.period,
+        amount: s.budget.amount,
+        spent: s.spent,
+        remaining: s.remaining,
+        percentage: s.percentage
       }))
-      const jsonString = JSON.stringify(data, null, 2)
-      const blob = new Blob([jsonString], { type: 'application/json' })
+      const json = JSON.stringify(data, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -370,21 +271,14 @@ const BudgetPage: React.FC = () => {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      toast({
-        title: 'Export Successful',
-        description: 'Budget data exported successfully'
-      })
-    } catch (error) {
-      toast({
-        title: 'Export Failed',
-        description: 'There was an error exporting your budget data',
-        variant: 'destructive'
-      })
+      toast({ title: 'Export Successful', description: 'Budget data exported successfully' })
+    } catch {
+      toast({ title: 'Export Failed', description: 'There was an error exporting your budget data', variant: 'destructive' })
     }
   }
 
-  const handleCardClick = (budget: Budget) => {
-    setSelectedBudget(budget)
+  const handleCardClick = (b: Budget) => {
+    setSelectedBudget(b)
     setOpenBudgetDialog(true)
     setDialogSearchQuery('')
     setDialogDateRange({
@@ -396,15 +290,13 @@ const BudgetPage: React.FC = () => {
 
   const filteredTransactionsForBudget = useMemo(() => {
     if (!selectedBudget) return []
-    let list = transactions.filter(
-      t => t.type === 'Expense' && t.category === selectedBudget.category
-    )
+    let list = transactions.filter(t => t.type === 'Expense' && t.category === selectedBudget.category)
     if (dialogDateRange?.from && dialogDateRange?.to) {
-      const fromTime = dialogDateRange.from.getTime()
-      const toTime = dialogDateRange.to.getTime()
+      const f = dialogDateRange.from.getTime()
+      const to = dialogDateRange.to.getTime()
       list = list.filter(t => {
-        const txTime = new Date(t.date).getTime()
-        return txTime >= fromTime && txTime <= toTime
+        const d = new Date(t.date).getTime()
+        return d >= f && d <= to
       })
     }
     if (dialogSearchQuery.trim()) {
@@ -421,9 +313,8 @@ const BudgetPage: React.FC = () => {
     dialogCurrentPage * dialogItemsPerPage
   )
 
-  // Enhanced getBudgetPeriodText to support bi-weekly and custom cycles.
-  const getBudgetPeriodText = (period: string, cycleLength?: number) => {
-    switch (period) {
+  const getBudgetPeriodText = (p: string, l?: number) => {
+    switch (p) {
       case 'weekly':
         return 'Weekly Budget'
       case 'bi-weekly':
@@ -433,19 +324,18 @@ const BudgetPage: React.FC = () => {
       case 'yearly':
         return 'Annual Budget'
       case 'custom':
-        return cycleLength ? `Custom Budget (${cycleLength} days)` : 'Custom Budget'
+        return l ? `Custom Budget (${l} days)` : 'Custom Budget'
       default:
         return 'Monthly Budget'
     }
   }
 
-  const getBudgetStatusColor = (percentage: number) => {
-    if (percentage >= 100) return 'bg-red-500'
-    if (percentage >= 75) return 'bg-yellow-500'
+  const getBudgetStatusColor = (pct: number) => {
+    if (pct >= 100) return 'bg-red-500'
+    if (pct >= 75) return 'bg-yellow-500'
     return 'bg-green-500'
   }
 
-  // Chart data for overall budget summaries.
   const doughnutData = {
     labels: budgetSummaries.map(b => b.budget.name || b.budget.category),
     datasets: [
@@ -455,35 +345,18 @@ const BudgetPage: React.FC = () => {
       }
     ]
   }
-
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false
-  }
-
+  const doughnutOptions = { responsive: true, maintainAspectRatio: false }
   const barData = {
     labels: budgetSummaries.map(b => b.budget.name || b.budget.category),
     datasets: [
-      {
-        label: 'Budget Amount',
-        data: budgetSummaries.map(b => b.budget.amount),
-        backgroundColor: '#6366f1'
-      },
-      {
-        label: 'Spent',
-        data: budgetSummaries.map(b => b.spent),
-        backgroundColor: '#f87171'
-      }
+      { label: 'Budget Amount', data: budgetSummaries.map(b => b.budget.amount), backgroundColor: '#6366f1' },
+      { label: 'Spent', data: budgetSummaries.map(b => b.spent), backgroundColor: '#f87171' }
     ]
   }
-
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    scales: {
-      x: { stacked: false },
-      y: { stacked: false, beginAtZero: true }
-    }
+    scales: { x: { stacked: false }, y: { stacked: false, beginAtZero: true } }
   }
 
   return (
@@ -596,37 +469,29 @@ const BudgetPage: React.FC = () => {
       ) : (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {currentItems.map(summary => (
+            {currentItems.map(s => (
               <Card
-                key={summary.budget.id}
+                key={s.budget.id}
                 className="overflow-hidden cursor-pointer"
-                onClick={() => handleCardClick(summary.budget)}
+                onClick={() => handleCardClick(s.budget)}
               >
                 <div
                   className="h-2"
-                  style={{
-                    backgroundColor:
-                      summary.budget.color || getCategoryColor(summary.budget.category)
-                  }}
+                  style={{ backgroundColor: s.budget.color || getCategoryColor(s.budget.category) }}
                 />
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="font-semibold">
-                        {summary.budget.name || summary.budget.category}
-                      </CardTitle>
+                      <CardTitle className="font-semibold">{s.budget.name || s.budget.category}</CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {getBudgetPeriodText(
-                          summary.budget.period,
-                          (summary.budget as any).cycleLength
-                        )}
+                        {getBudgetPeriodText(s.budget.period, (s.budget as any).cycleLength)}
                       </p>
                     </div>
                     <div className="flex gap-1">
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={e => handleEdit(summary.budget, e)}
+                        onClick={e => handleEdit(s.budget, e)}
                         className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       >
                         <Pencil className="h-4 w-4" />
@@ -634,7 +499,7 @@ const BudgetPage: React.FC = () => {
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={e => handleDelete(summary.budget.id, e)}
+                        onClick={e => handleDelete(s.budget.id, e)}
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       >
                         <Trash className="h-4 w-4" />
@@ -644,31 +509,24 @@ const BudgetPage: React.FC = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-2xl font-bold">{formatCurrency(summary.spent)}</span>
-                    <span className="text-sm text-muted-foreground">
-                      of {formatCurrency(summary.budget.amount)}
-                    </span>
+                    <span className="text-2xl font-bold">{formatCurrency(s.spent)}</span>
+                    <span className="text-sm text-muted-foreground">of {formatCurrency(s.budget.amount)}</span>
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Spent</span>
-                      <span>{summary.percentage.toFixed(0)}%</span>
+                      <span>{s.percentage.toFixed(0)}%</span>
                     </div>
                     <Progress
-                      value={summary.percentage > 100 ? 100 : summary.percentage}
+                      value={s.percentage > 100 ? 100 : s.percentage}
                       className="h-2"
-                      indicatorColor={getBudgetStatusColor(summary.percentage)}
+                      indicatorColor={getBudgetStatusColor(s.percentage)}
                     />
                   </div>
                   <div className="flex justify-between pt-2">
-                    <Badge variant="outline" className="bg-background">
-                      {summary.budget.period}
-                    </Badge>
-                    <Badge
-                      variant={summary.percentage >= 100 ? 'destructive' : 'outline'}
-                      className="bg-background"
-                    >
-                      {summary.percentage >= 100 ? (
+                    <Badge variant="outline" className="bg-background">{s.budget.period}</Badge>
+                    <Badge variant={s.percentage >= 100 ? 'destructive' : 'outline'} className="bg-background">
+                      {s.percentage >= 100 ? (
                         <>
                           <AlertCircle className="mr-1 h-3 w-3" />
                           Over budget
@@ -676,7 +534,7 @@ const BudgetPage: React.FC = () => {
                       ) : (
                         <>
                           <Clock className="mr-1 h-3 w-3" />
-                          {formatCurrency(summary.remaining)} left
+                          {formatCurrency(s.remaining)} left
                         </>
                       )}
                     </Badge>
@@ -692,23 +550,16 @@ const BudgetPage: React.FC = () => {
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>
             {[...Array(totalPages)].map((_, i) => {
               const page = i + 1
-              if (
-                page === 1 ||
-                page === totalPages ||
-                (page >= currentPage - 1 && page <= currentPage + 1)
-              ) {
+              if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
                 return (
                   <PaginationItem key={page}>
-                    <PaginationLink
-                      onClick={() => setCurrentPage(page)}
-                      isActive={page === currentPage}
-                    >
+                    <PaginationLink onClick={() => setCurrentPage(page)} isActive={page === currentPage}>
                       {page}
                     </PaginationLink>
                   </PaginationItem>
@@ -724,7 +575,7 @@ const BudgetPage: React.FC = () => {
             })}
             <PaginationItem>
               <PaginationNext
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
                 className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
               />
             </PaginationItem>
@@ -743,7 +594,7 @@ const BudgetPage: React.FC = () => {
                 <Label htmlFor="category">Expense Category</Label>
                 <Select
                   value={newBudget.category}
-                  onValueChange={value => handleSelectChange('category', value)}
+                  onValueChange={v => handleSelectChange('category', v)}
                   disabled={!!editingBudgetId}
                 >
                   <SelectTrigger>
@@ -753,23 +604,15 @@ const BudgetPage: React.FC = () => {
                     {editingBudgetId ? (
                       <SelectItem value={newBudget.category}>{newBudget.category}</SelectItem>
                     ) : availableCategories.length > 0 ? (
-                      availableCategories.map(category => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))
+                      availableCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)
                     ) : (
-                      <SelectItem value="" disabled>
-                        No categories available
-                      </SelectItem>
+                      <SelectItem value="" disabled>No categories available</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name">
-                  Budget Name <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="name">Budget Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="name"
                   name="name"
@@ -780,9 +623,7 @@ const BudgetPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount">
-                  Budget Amount <span className="text-red-500">*</span>
-                </Label>
+                <Label htmlFor="amount">Budget Amount <span className="text-red-500">*</span></Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -803,7 +644,7 @@ const BudgetPage: React.FC = () => {
                 <Label htmlFor="period">Budget Period</Label>
                 <Select
                   value={newBudget.period}
-                  onValueChange={value => handleSelectChange('period', value)}
+                  onValueChange={v => handleSelectChange('period', v)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
@@ -885,13 +726,11 @@ const BudgetPage: React.FC = () => {
           </form>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!confirmDelete} onOpenChange={open => !open && setConfirmDelete(null)}>
+      <Dialog open={!!confirmDelete} onOpenChange={o => !o && setConfirmDelete(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Budget</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this budget? This action cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Are you sure you want to delete this budget? This action cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDelete(null)}>
@@ -909,8 +748,7 @@ const BudgetPage: React.FC = () => {
             <>
               <DialogHeader>
                 <DialogTitle>
-                  Transactions for{' '}
-                  <span style={{ color: selectedBudget.color }}>
+                  Transactions for <span style={{ color: selectedBudget.color }}>
                     {selectedBudget.name || selectedBudget.category}
                   </span>
                 </DialogTitle>
@@ -927,8 +765,7 @@ const BudgetPage: React.FC = () => {
                         {dialogDateRange?.from ? (
                           dialogDateRange.to ? (
                             <>
-                              {format(dialogDateRange.from, 'LLL dd')} -{' '}
-                              {format(dialogDateRange.to, 'LLL dd, yyyy')}
+                              {format(dialogDateRange.from, 'LLL dd')} - {format(dialogDateRange.to, 'LLL dd, yyyy')}
                             </>
                           ) : (
                             format(dialogDateRange.from, 'LLL dd, yyyy')
@@ -965,9 +802,7 @@ const BudgetPage: React.FC = () => {
                 {filteredTransactionsForBudget.length === 0 ? (
                   <Alert variant="default" className="bg-muted/50">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      No transactions found for this budget in the selected range or matching your search.
-                    </AlertDescription>
+                    <AlertDescription>No transactions found for this budget in the selected range or matching your search.</AlertDescription>
                   </Alert>
                 ) : (
                   <div className="overflow-auto rounded border">
@@ -982,9 +817,7 @@ const BudgetPage: React.FC = () => {
                       <tbody>
                         {dialogPageItems.map((tx: Transaction) => (
                           <tr key={tx.id} className="border-b last:border-0">
-                            <td className="px-4 py-2 whitespace-nowrap">
-                              {format(new Date(tx.date), 'PPP')}
-                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap">{format(new Date(tx.date), 'PPP')}</td>
                             <td className="px-4 py-2">{tx.notes}</td>
                             <td className="px-4 py-2 text-right">{formatCurrency(tx.amount)}</td>
                           </tr>
@@ -999,23 +832,16 @@ const BudgetPage: React.FC = () => {
                       <PaginationContent>
                         <PaginationItem>
                           <PaginationPrevious
-                            onClick={() => setDialogCurrentPage(prev => Math.max(prev - 1, 1))}
+                            onClick={() => setDialogCurrentPage(p => Math.max(p - 1, 1))}
                             className={dialogCurrentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                           />
                         </PaginationItem>
                         {[...Array(dialogTotalPages)].map((_, i) => {
                           const page = i + 1
-                          if (
-                            page === 1 ||
-                            page === dialogTotalPages ||
-                            (page >= dialogCurrentPage - 1 && page <= dialogCurrentPage + 1)
-                          ) {
+                          if (page === 1 || page === dialogTotalPages || (page >= dialogCurrentPage - 1 && page <= dialogCurrentPage + 1)) {
                             return (
                               <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={() => setDialogCurrentPage(page)}
-                                  isActive={page === dialogCurrentPage}
-                                >
+                                <PaginationLink onClick={() => setDialogCurrentPage(page)} isActive={page === dialogCurrentPage}>
                                   {page}
                                 </PaginationLink>
                               </PaginationItem>
@@ -1031,14 +857,8 @@ const BudgetPage: React.FC = () => {
                         })}
                         <PaginationItem>
                           <PaginationNext
-                            onClick={() =>
-                              setDialogCurrentPage(prev => Math.min(prev + 1, dialogTotalPages))
-                            }
-                            className={
-                              dialogCurrentPage === dialogTotalPages
-                                ? 'pointer-events-none opacity-50'
-                                : ''
-                            }
+                            onClick={() => setDialogCurrentPage(p => Math.min(p + 1, dialogTotalPages))}
+                            className={dialogCurrentPage === dialogTotalPages ? 'pointer-events-none opacity-50' : ''}
                           />
                         </PaginationItem>
                       </PaginationContent>
