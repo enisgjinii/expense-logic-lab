@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Search, SlidersHorizontal } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { useTranslation } from 'react-i18next';
 
 const Transactions: React.FC = () => {
   const { transactions } = useFinance();
@@ -17,20 +16,19 @@ const Transactions: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [timeFilter, setTimeFilter] = useState('all');
   const isSmallScreen = width < 640;
-  const { t } = useTranslation();
   
   return (
     <div className="space-y-4 sm:space-y-8 pb-6 sm:pb-10 animate-in px-2 sm:px-4 md:px-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold">{t('transactions.title')}</h1>
-        <p className="text-sm text-muted-foreground">{t('transactions.description')}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">Transactions</h1>
+        <p className="text-sm text-muted-foreground">Manage and analyze all your financial transactions</p>
       </div>
       
       <Card className="border bg-background/60 backdrop-blur-sm shadow-sm">
         <CardHeader className="pb-0">
-          <CardTitle className="text-xl">{t('transactions.management')}</CardTitle>
+          <CardTitle className="text-xl">Transaction Management</CardTitle>
           <CardDescription>
-            {t('transactions.description')}
+            View, filter, edit and analyze all your financial movements in one place
           </CardDescription>
         </CardHeader>
         <CardContent>
