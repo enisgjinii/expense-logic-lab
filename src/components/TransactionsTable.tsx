@@ -13,8 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
 import { parseISO, format as formatFns } from 'date-fns'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts'
-// Assume you have these Tabs components in your UI library.
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts'
+import { motion } from 'framer-motion'
+// Assume Tabs components are available from your UI library.
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 /* --------------------------------------------------------------------------
@@ -165,30 +166,19 @@ function PaymentTypeIcon({ type }: { type: string }) {
 /* --------------------------------------------------------------------------
    Duplicate Transaction Detection
    -------------------------------------------------------------------------- */
-
-/**
- * Groups transactions by a composite key (date, account, category, amount)
- * and returns an array of groups with more than one transaction.
- */
 function detectDuplicateTransactions(transactions: Transaction[]): Transaction[][] {
   const groups: Record<string, Transaction[]> = {}
   transactions.forEach(tx => {
-    // Use only the date portion (yyyy-mm-dd) for grouping.
     const date = new Date(tx.date).toISOString().slice(0, 10)
     const key = `${date}-${tx.account.trim().toLowerCase()}-${tx.category.trim().toLowerCase()}-${tx.amount.toFixed(2)}`
     if (!groups[key]) groups[key] = []
     groups[key].push(tx)
   })
-  // Only return groups with more than one transaction.
   return Object.values(groups).filter(group => group.length > 1)
 }
 
-/**
- * Renders a card with a list of potential duplicate transaction groups.
- */
 function DuplicateTransactionsAlert({ transactions }: { transactions: Transaction[] }) {
   const duplicateGroups = useMemo(() => detectDuplicateTransactions(transactions), [transactions])
-
   if (duplicateGroups.length === 0) return null
 
   return (
@@ -220,36 +210,26 @@ function DuplicateTransactionsAlert({ transactions }: { transactions: Transactio
 /* --------------------------------------------------------------------------
    Cash Flow Forecasting
    -------------------------------------------------------------------------- */
-
-/**
- * Groups transactions by month and computes the net flow.
- * Uses the average of the last 3 months as a simple forecast.
- */
 function calculateCashFlowForecast(transactions: Transaction[], forecastPeriods = 3) {
   const filtered = transactions.filter(tx => tx.type === 'Income' || tx.type === 'Expense')
   const groups = new Map<string, number>()
-
   filtered.forEach(tx => {
     const date = new Date(tx.date)
     const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`
     const current = groups.get(monthKey) || 0
     groups.set(monthKey, current + (tx.type === 'Income' ? tx.amount : -tx.amount))
   })
-
   const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
     const [yearA, monthA] = a.split('-').map(Number)
     const [yearB, monthB] = b.split('-').map(Number)
     return new Date(yearA, monthA - 1).getTime() - new Date(yearB, monthB - 1).getTime()
   })
-
   const history = sortedKeys.map(key => ({
     period: key,
     netFlow: groups.get(key)
   }))
-
   const lastPeriods = history.slice(-3)
   const avg = lastPeriods.reduce((sum, item) => sum + (item.netFlow || 0), 0) / (lastPeriods.length || 1)
-
   const forecast = []
   const lastKey = sortedKeys[sortedKeys.length - 1]
   let [year, month] = lastKey.split('-').map(Number)
@@ -264,16 +244,11 @@ function calculateCashFlowForecast(transactions: Transaction[], forecastPeriods 
       predictedNetFlow: avg
     })
   }
-
   return { history, forecast }
 }
 
-/**
- * Renders a line chart showing both historical and forecasted net cash flow.
- */
 function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
   const { history, forecast } = useMemo(() => calculateCashFlowForecast(transactions, 3), [transactions])
-
   const chartData = useMemo(() => {
     const data = history.map(item => ({
       period: item.period,
@@ -289,7 +264,6 @@ function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
     })
     return data
   }, [history, forecast])
-
   return (
     <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
       <CardHeader className="py-2 px-4 md:px-6">
@@ -331,7 +305,112 @@ function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
 }
 
 /* --------------------------------------------------------------------------
-   Main Transactions Table Component with Nav Tabs
+   Advanced Payment Method Insights Component
+   -------------------------------------------------------------------------- */
+function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }) {
+  // Local date range filter specific to Payment Insights.
+  const [insightsDateRange, setInsightsDateRange] = useState<DateRange | undefined>()
+  // Filter expense transactions by the local date range.
+  const expenseTransactions = useMemo(() => {
+    return transactions.filter(tx => {
+      if (tx.type !== 'Expense') return false
+      const txDate = new Date(tx.date)
+      if (insightsDateRange?.from && txDate < insightsDateRange.from) return false
+      if (insightsDateRange?.to && txDate > insightsDateRange.to) return false
+      return true
+    })
+  }, [transactions, insightsDateRange])
+
+  // Calculate totals for cash and card (both credit and debit).
+  const totals = useMemo(() => {
+    let cashTotal = 0, cardTotal = 0
+    expenseTransactions.forEach(tx => {
+      if (tx.payment_type === 'CASH') {
+        cashTotal += tx.amount
+      } else if (tx.payment_type === 'CREDIT_CARD' || tx.payment_type === 'DEBIT_CARD') {
+        cardTotal += tx.amount
+      }
+    })
+    return { cashTotal, cardTotal, total: cashTotal + cardTotal }
+  }, [expenseTransactions])
+
+  const pieData = useMemo(() => ([
+    { name: 'Cash', value: totals.cashTotal },
+    { name: 'Card', value: totals.cardTotal }
+  ]), [totals])
+
+  const COLORS = ['#FF595E', '#4ECDC4']
+
+  // Prepare detailed breakdown data for a table.
+  const breakdownData = useMemo(() => {
+    const rows = [
+      { method: 'Cash', total: totals.cashTotal, percentage: totals.total ? (totals.cashTotal / totals.total) * 100 : 0 },
+      { method: 'Card', total: totals.cardTotal, percentage: totals.total ? (totals.cardTotal / totals.total) * 100 : 0 }
+    ]
+    return rows
+  }, [totals])
+
+  return (
+    <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
+      <CardHeader className="py-2 px-4 md:px-6">
+        <CardTitle className="text-xl">Cash vs. Card Expense Insights</CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          Compare your expenses based on payment method
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <DateRangePicker dateRange={insightsDateRange} onDateRangeChange={setInsightsDateRange} />
+        </div>
+        <div className="flex flex-col md:flex-row items-center">
+          <div style={{ width: '100%', height: 300 }} className="md:w-1/2">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="mt-4 md:mt-0 md:ml-6 w-full">
+            <CardTitle className="text-lg font-semibold mb-2">Summary</CardTitle>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="px-2 py-1 border-b">Payment Method</th>
+                  <th className="px-2 py-1 border-b">Total</th>
+                  <th className="px-2 py-1 border-b">Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                {breakdownData.map((row, idx) => (
+                  <motion.tr
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: idx * 0.1 }}
+                    className="border-b"
+                  >
+                    <td className="px-2 py-1">{row.method}</td>
+                    <td className="px-2 py-1">{formatCurrency(row.total)}</td>
+                    <td className="px-2 py-1">{row.percentage.toFixed(1)}%</td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* --------------------------------------------------------------------------
+   Main Transactions Table Component with Nav Tabs & Animations
    -------------------------------------------------------------------------- */
 export default function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
   const { deleteTransaction } = useFinance()
@@ -529,262 +608,274 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
-      {/* Nav Tabs for a Compact UI */}
       <Tabs defaultValue="transactions">
         <TabsList>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
           <TabsTrigger value="forecast">Forecast</TabsTrigger>
+          <TabsTrigger value="insights">Payment Insights</TabsTrigger>
         </TabsList>
 
         {/* Transactions Tab */}
         <TabsContent value="transactions">
-          <Card className="border bg-card/60 backdrop-blur-sm shadow-sm mb-4">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Filter Transactions</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">
-                Narrow down your transactions with filters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
-                <div className="relative w-full sm:w-[300px]">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search transactions..."
-                    value={searchTerm}
-                    onChange={e => {
-                      setSearchTerm(e.target.value)
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <Card className="border bg-card/60 backdrop-blur-sm shadow-sm mb-4">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Filter Transactions</CardTitle>
+                <CardDescription className="text-sm text-muted-foreground">
+                  Narrow down your transactions with filters
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
+                  <div className="relative w-full sm:w-[300px]">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search transactions..."
+                      value={searchTerm}
+                      onChange={e => {
+                        setSearchTerm(e.target.value)
+                        setCurrentPage(1)
+                      }}
+                      className="pl-8 h-9 text-sm"
+                    />
+                  </div>
+                  <DateRangePicker
+                    dateRange={dateRange}
+                    onDateRangeChange={range => {
+                      setDateRange(range)
                       setCurrentPage(1)
                     }}
-                    className="pl-8 h-9 text-sm"
                   />
-                </div>
-                <DateRangePicker
-                  dateRange={dateRange}
-                  onDateRangeChange={range => {
-                    setDateRange(range)
-                    setCurrentPage(1)
-                  }}
-                />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
-                      <SlidersHorizontal className="h-4 w-4" />
-                      <span className="hidden sm:inline">More Filters</span>
-                      <span className="sm:hidden">Filter</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[240px]">
-                    <DropdownMenuItem onClick={() => { setTypeFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
-                      All Types {typeFilter === null && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setTypeFilter('Income'); setCurrentPage(1) }} className="justify-between text-sm">
-                      Income {typeFilter === 'Income' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setTypeFilter('Expense'); setCurrentPage(1) }} className="justify-between text-sm">
-                      Expense {typeFilter === 'Expense' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="h-px my-1 p-0" />
-                    <DropdownMenuItem onClick={() => { setPaymentFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
-                      All Payments {paymentFilter === null && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPaymentFilter('CASH'); setCurrentPage(1) }} className="justify-between text-sm">
-                      <div className="flex items-center">
-                        <PaymentTypeIcon type="CASH" />Cash
-                      </div>
-                      {paymentFilter === 'CASH' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPaymentFilter('CREDIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
-                      <div className="flex items-center">
-                        <PaymentTypeIcon type="CREDIT_CARD" />Credit Card
-                      </div>
-                      {paymentFilter === 'CREDIT_CARD' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPaymentFilter('DEBIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
-                      <div className="flex items-center">
-                        <PaymentTypeIcon type="DEBIT_CARD" />Debit Card
-                      </div>
-                      {paymentFilter === 'DEBIT_CARD' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setPaymentFilter('TRANSFER'); setCurrentPage(1) }} className="justify-between text-sm">
-                      <div className="flex items-center">
-                        <PaymentTypeIcon type="TRANSFER" />Transfer
-                      </div>
-                      {paymentFilter === 'TRANSFER' && <span>✓</span>}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="h-px my-1 p-0" />
-                    <DropdownMenuItem onClick={() => { setAccountFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
-                      All Accounts {accountFilter === null && <span>✓</span>}
-                    </DropdownMenuItem>
-                    {allAccounts.map(acc => (
-                      <DropdownMenuItem key={acc} onClick={() => { setAccountFilter(acc); setCurrentPage(1) }} className="justify-between text-sm">
-                        {acc} {accountFilter === acc && <span>✓</span>}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span className="hidden sm:inline">More Filters</span>
+                        <span className="sm:hidden">Filter</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[240px]">
+                      <DropdownMenuItem onClick={() => { setTypeFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
+                        All Types {typeFilter === null && <span>✓</span>}
                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                  <Download className="mr-1 h-4 w-4" />Export CSV
-                </Button>
-                <select
-                  className="h-9 px-3 py-0 border rounded text-sm bg-background"
-                  value={pageSize}
-                  onChange={e => {
-                    setPageSize(Number(e.target.value))
-                    setCurrentPage(1)
-                  }}
-                >
-                  <option value="10">10 per page</option>
-                  <option value="25">25 per page</option>
-                  <option value="50">50 per page</option>
-                  <option value="100">100 per page</option>
-                </select>
-                <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
-                  <DialogTrigger asChild>
-                    <Button variant="default" size="sm">+ New Transaction</Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle>Create a new transaction</DialogTitle>
-                    </DialogHeader>
-                    <TransactionForm onSuccess={() => setOpenCreateModal(false)} />
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardContent>
-          </Card>
+                      <DropdownMenuItem onClick={() => { setTypeFilter('Income'); setCurrentPage(1) }} className="justify-between text-sm">
+                        Income {typeFilter === 'Income' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setTypeFilter('Expense'); setCurrentPage(1) }} className="justify-between text-sm">
+                        Expense {typeFilter === 'Expense' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="h-px my-1 p-0" />
+                      <DropdownMenuItem onClick={() => { setPaymentFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
+                        All Payments {paymentFilter === null && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPaymentFilter('CASH'); setCurrentPage(1) }} className="justify-between text-sm">
+                        <div className="flex items-center">
+                          <PaymentTypeIcon type="CASH" />Cash
+                        </div>
+                        {paymentFilter === 'CASH' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPaymentFilter('CREDIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
+                        <div className="flex items-center">
+                          <PaymentTypeIcon type="CREDIT_CARD" />Credit Card
+                        </div>
+                        {paymentFilter === 'CREDIT_CARD' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPaymentFilter('DEBIT_CARD'); setCurrentPage(1) }} className="justify-between text-sm">
+                        <div className="flex items-center">
+                          <PaymentTypeIcon type="DEBIT_CARD" />Debit Card
+                        </div>
+                        {paymentFilter === 'DEBIT_CARD' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setPaymentFilter('TRANSFER'); setCurrentPage(1) }} className="justify-between text-sm">
+                        <div className="flex items-center">
+                          <PaymentTypeIcon type="TRANSFER" />Transfer
+                        </div>
+                        {paymentFilter === 'TRANSFER' && <span>✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="h-px my-1 p-0" />
+                      <DropdownMenuItem onClick={() => { setAccountFilter(null); setCurrentPage(1) }} className="justify-between text-sm">
+                        All Accounts {accountFilter === null && <span>✓</span>}
+                      </DropdownMenuItem>
+                      {allAccounts.map(acc => (
+                        <DropdownMenuItem key={acc} onClick={() => { setAccountFilter(acc); setCurrentPage(1) }} className="justify-between text-sm">
+                          {acc} {accountFilter === acc && <span>✓</span>}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="outline" size="sm" onClick={resetFilters}>Reset</Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                    <Download className="mr-1 h-4 w-4" />Export CSV
+                  </Button>
+                  <select
+                    className="h-9 px-3 py-0 border rounded text-sm bg-background"
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(Number(e.target.value))
+                      setCurrentPage(1)
+                    }}
+                  >
+                    <option value="10">10 per page</option>
+                    <option value="25">25 per page</option>
+                    <option value="50">50 per page</option>
+                    <option value="100">100 per page</option>
+                  </select>
+                  <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" size="sm">+ New Transaction</Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Create a new transaction</DialogTitle>
+                      </DialogHeader>
+                      <TransactionForm onSuccess={() => setOpenCreateModal(false)} />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
-            <CardHeader className="py-2 px-4 md:px-6">
-              <CardTitle className="text-xl">Transactions</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead className="w-[90px] md:w-[120px] cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('date')}>
-                        <span className="flex items-center justify-start">Date {renderSortIcon('date')}</span>
-                      </TableHead>
-                      <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('account')}>
-                        <span className="flex items-center justify-start">Account {renderSortIcon('account')}</span>
-                      </TableHead>
-                      <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('category')}>
-                        <span className="flex items-center justify-start">Category {renderSortIcon('category')}</span>
-                      </TableHead>
-                      <TableHead className="cursor-pointer text-right px-2 md:px-4" onClick={() => handleSort('amount')}>
-                        <span className="flex items-center justify-end">Amount {renderSortIcon('amount')}</span>
-                      </TableHead>
-                      <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Type</TableHead>
-                      <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Payment</TableHead>
-                      <TableHead className="text-right px-2 md:px-4">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedTransactions.length > 0 ? (
-                      paginatedTransactions.map(tx => {
-                        const isExpanded = expandedRows.has(tx.id)
-                        return (
-                          <React.Fragment key={tx.id}>
-                            <TableRow className="group hover:bg-accent/30 transition-colors">
-                              <TableCell className="font-medium group-hover:text-primary px-2 md:px-4 text-sm md:text-base">
-                                {formatDate(tx.date)}
-                              </TableCell>
-                              <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                                {tx.account}
-                              </TableCell>
-                              <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                                {tx.category}
-                              </TableCell>
-                              <TableCell className={`text-right font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'} px-2 md:px-4 text-sm md:text-base`}>
-                                {tx.type === 'Income' ? '+' : '-'} {formatCurrency(tx.amount)}
-                              </TableCell>
-                              <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell text-sm md:text-base">
-                                <Badge variant={tx.type === 'Income' ? 'outline' : 'secondary'} className={`w-fit ml-auto px-2 py-0.5 text-xs ${tx.type === 'Income' ? 'border-green-500/50 bg-green-500/10 text-green-600' : 'border-red-500/50 bg-red-500/10 text-red-600'}`}>
-                                  {tx.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell">
-                                <Badge variant="outline" className="flex items-center justify-center gap-1 w-fit ml-auto px-1 py-0.5 text-xs">
-                                  <PaymentTypeIcon type={tx.payment_type || 'TRANSFER'} />
-                                  <span className="hidden sm:inline">{(tx.payment_type || 'TRANSFER').replace('_', ' ')}</span>
-                                  <span className="sm:hidden text-[0.7rem]">({(tx.payment_type || 'TRANSFER').charAt(0)})</span>
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right px-2 md:px-4 space-x-2">
-                                <Button variant="ghost" size="sm" onClick={() => toggleRowExpansion(tx.id)} className="p-0 h-auto w-6 inline-flex items-center justify-center">
-                                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleEdit(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Edit Transaction">
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDelete(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Delete Transaction">
-                                  <Trash className="h-4 w-4 text-destructive" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => openInvoice(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="View Invoice">
-                                  <FileText className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                            {isExpanded && (
-                              <TableRow className="bg-muted/20">
-                                <TableCell colSpan={7} className="p-4 text-sm">
-                                  <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1">
-                                      <h4 className="font-semibold">Notes:</h4>
-                                      <p>{tx.notes || '-'}</p>
-                                    </div>
-                                    <div className="flex-1">
-                                      <h4 className="font-semibold">Description:</h4>
-                                      <p>{tx.description || '-'}</p>
-                                    </div>
-                                  </div>
+            <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
+              <CardHeader className="py-2 px-4 md:px-6">
+                <CardTitle className="text-xl">Transactions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="rounded-md border overflow-x-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow>
+                        <TableHead className="w-[90px] md:w-[120px] cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('date')}>
+                          <span className="flex items-center justify-start">Date {renderSortIcon('date')}</span>
+                        </TableHead>
+                        <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('account')}>
+                          <span className="flex items-center justify-start">Account {renderSortIcon('account')}</span>
+                        </TableHead>
+                        <TableHead className="cursor-pointer text-left px-2 md:px-4" onClick={() => handleSort('category')}>
+                          <span className="flex items-center justify-start">Category {renderSortIcon('category')}</span>
+                        </TableHead>
+                        <TableHead className="cursor-pointer text-right px-2 md:px-4" onClick={() => handleSort('amount')}>
+                          <span className="flex items-center justify-end">Amount {renderSortIcon('amount')}</span>
+                        </TableHead>
+                        <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Type</TableHead>
+                        <TableHead className="text-right px-2 md:px-4 hidden sm:table-cell">Payment</TableHead>
+                        <TableHead className="text-right px-2 md:px-4">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedTransactions.length > 0 ? (
+                        paginatedTransactions.map(tx => {
+                          const isExpanded = expandedRows.has(tx.id)
+                          return (
+                            <React.Fragment key={tx.id}>
+                              <TableRow className="group hover:bg-accent/30 transition-colors">
+                                <TableCell className="font-medium group-hover:text-primary px-2 md:px-4 text-sm md:text-base">
+                                  {formatDate(tx.date)}
+                                </TableCell>
+                                <TableCell className="px-2 md:px-4 text-sm md:text-base">
+                                  {tx.account}
+                                </TableCell>
+                                <TableCell className="px-2 md:px-4 text-sm md:text-base">
+                                  {tx.category}
+                                </TableCell>
+                                <TableCell className={`text-right font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'} px-2 md:px-4 text-sm md:text-base`}>
+                                  {tx.type === 'Income' ? '+' : '-'} {formatCurrency(tx.amount)}
+                                </TableCell>
+                                <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell text-sm md:text-base">
+                                  <Badge variant={tx.type === 'Income' ? 'outline' : 'secondary'} className={`w-fit ml-auto px-2 py-0.5 text-xs ${tx.type === 'Income' ? 'border-green-500/50 bg-green-500/10 text-green-600' : 'border-red-500/50 bg-red-500/10 text-red-600'}`}>
+                                    {tx.type}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right px-2 md:px-4 hidden sm:table-cell">
+                                  <Badge variant="outline" className="flex items-center justify-center gap-1 w-fit ml-auto px-1 py-0.5 text-xs">
+                                    <PaymentTypeIcon type={tx.payment_type || 'TRANSFER'} />
+                                    <span className="hidden sm:inline">{(tx.payment_type || 'TRANSFER').replace('_', ' ')}</span>
+                                    <span className="sm:hidden text-[0.7rem]">({(tx.payment_type || 'TRANSFER').charAt(0)})</span>
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right px-2 md:px-4 space-x-2">
+                                  <Button variant="ghost" size="sm" onClick={() => toggleRowExpansion(tx.id)} className="p-0 h-auto w-6 inline-flex items-center justify-center">
+                                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleEdit(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Edit Transaction">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Delete Transaction">
+                                    <Trash className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => openInvoice(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="View Invoice">
+                                    <FileText className="h-4 w-4" />
+                                  </Button>
                                 </TableCell>
                               </TableRow>
-                            )}
-                          </React.Fragment>
-                        )
-                      })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={7} className="h-24 text-center text-sm">
-                          No transactions found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {sortedTransactions.length > pageSize && (
-                <div className="flex justify-between items-center mt-2 gap-2 p-4">
-                  <div className="text-sm text-muted-foreground">
-                    Showing {startIndex + 1}-{Math.min(startIndex + pageSize, sortedTransactions.length)} of {sortedTransactions.length} transactions
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Prev</Button>
-                    <span className="text-sm">{currentPage} of {totalPages}</span>
-                    <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
-                  </div>
+                              {isExpanded && (
+                                <TableRow className="bg-muted/20">
+                                  <TableCell colSpan={7} className="p-4 text-sm">
+                                    <div className="flex flex-col md:flex-row gap-4">
+                                      <div className="flex-1">
+                                        <h4 className="font-semibold">Notes:</h4>
+                                        <p>{tx.notes || '-'}</p>
+                                      </div>
+                                      <div className="flex-1">
+                                        <h4 className="font-semibold">Description:</h4>
+                                        <p>{tx.description || '-'}</p>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </React.Fragment>
+                          )
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={7} className="h-24 text-center text-sm">
+                            No transactions found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+                {sortedTransactions.length > pageSize && (
+                  <div className="flex justify-between items-center mt-2 gap-2 p-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {startIndex + 1}-{Math.min(startIndex + pageSize, sortedTransactions.length)} of {sortedTransactions.length} transactions
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Prev</Button>
+                      <span className="text-sm">{currentPage} of {totalPages}</span>
+                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
         </TabsContent>
 
         {/* Duplicates Tab */}
         <TabsContent value="duplicates">
-          <DuplicateTransactionsAlert transactions={transactions} />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <DuplicateTransactionsAlert transactions={transactions} />
+          </motion.div>
         </TabsContent>
 
         {/* Forecast Tab */}
         <TabsContent value="forecast">
-          <CashFlowForecast transactions={transactions} />
-          {/* Optionally, you can also include expense distribution here if desired */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <CashFlowForecast transactions={transactions} />
+          </motion.div>
+        </TabsContent>
+
+        {/* Payment Insights Tab */}
+        <TabsContent value="insights">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <PaymentMethodInsights transactions={transactions} />
+          </motion.div>
         </TabsContent>
       </Tabs>
 
