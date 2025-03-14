@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react'
 import { useFinance } from '@/contexts/FinanceContext'
 import { Transaction } from '@/types/finance'
@@ -13,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
 import { parseISO, format as formatFns } from 'date-fns'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction, onSuccess?: () => void }) {
   const { addTransaction, updateTransaction } = useFinance()
@@ -25,8 +26,10 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
     type: 'Expense',
     payment_type: 'CASH',
     notes: '',
-    description: ''
+    description: '',
+    currency: 'USD'
   })
+  
   useEffect(() => {
     if (transaction) {
       setFormData({
@@ -37,10 +40,12 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
         type: transaction.type,
         payment_type: transaction.payment_type || 'TRANSFER',
         notes: transaction.notes || '',
-        description: transaction.description || ''
+        description: transaction.description || '',
+        currency: transaction.currency || 'USD'
       })
     }
   }, [transaction])
+  
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
@@ -52,10 +57,12 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
       alert('There was an error processing the transaction.')
     }
   }
+  
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: name === 'amount' ? Number(value) || 0 : value }))
   }
+  
   function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     try {
       const selectedDate = new Date(e.target.value)
@@ -65,6 +72,17 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
       alert('Invalid date selected.')
     }
   }
+  
+  function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value as "Income" | "Expense" | "Transfer"
+    setFormData(prev => ({ ...prev, type: value }))
+  }
+  
+  function handlePaymentTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value as "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER"
+    setFormData(prev => ({ ...prev, payment_type: value }))
+  }
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -85,19 +103,24 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
       </div>
       <div>
         <label htmlFor="type" className="block text-sm font-medium mb-1">Transaction Type</label>
-        <select id="type" name="type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.type} onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}>
+        <select id="type" name="type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.type} onChange={handleTypeChange}>
           <option value="Income">Income</option>
           <option value="Expense">Expense</option>
+          <option value="Transfer">Transfer</option>
         </select>
       </div>
       <div>
         <label htmlFor="payment_type" className="block text-sm font-medium mb-1">Payment Type</label>
-        <select id="payment_type" name="payment_type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.payment_type} onChange={(e) => setFormData(prev => ({ ...prev, payment_type: e.target.value }))}>
+        <select id="payment_type" name="payment_type" className="border rounded p-2 w-full focus:outline-none text-sm" value={formData.payment_type} onChange={handlePaymentTypeChange}>
           <option value="CASH">Cash</option>
           <option value="CREDIT_CARD">Credit Card</option>
           <option value="DEBIT_CARD">Debit Card</option>
           <option value="TRANSFER">Transfer</option>
         </select>
+      </div>
+      <div>
+        <label htmlFor="currency" className="block text-sm font-medium mb-1">Currency</label>
+        <Input id="currency" name="currency" value={formData.currency} onChange={handleChange} placeholder="e.g. USD" />
       </div>
       <div>
         <label htmlFor="notes" className="block text-sm font-medium mb-1">Notes</label>
@@ -128,8 +151,8 @@ function PaymentTypeIcon({ type }: { type: string }) {
   }
 }
 
-export default function TransactionsPage() {
-  const { transactions, deleteTransaction } = useFinance()
+export default function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
+  const { deleteTransaction } = useFinance()
   const [openCreateModal, setOpenCreateModal] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -142,14 +165,16 @@ export default function TransactionsPage() {
   const [sortBy, setSortBy] = useState<keyof Transaction>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 10
+  const [pageSize, setPageSize] = useState(10)
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  
   const allAccounts = useMemo(() => {
     const set = new Set<string>()
     transactions.forEach(tx => set.add(tx.account))
     return Array.from(set).sort()
   }, [transactions])
+  
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const query = searchTerm.toLowerCase()
@@ -169,6 +194,7 @@ export default function TransactionsPage() {
       return matchesSearch && matchesType && matchesPayment && matchesAccount && matchesDate
     })
   }, [transactions, searchTerm, typeFilter, paymentFilter, accountFilter, dateRange])
+  
   const sortedTransactions = useMemo(() => {
     const sorted = [...filteredTransactions]
     sorted.sort((a, b) => {
@@ -184,14 +210,17 @@ export default function TransactionsPage() {
     })
     return sorted
   }, [filteredTransactions, sortBy, sortOrder])
+  
   const startIndex = (currentPage - 1) * pageSize
   const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + pageSize)
   const totalPages = Math.ceil(sortedTransactions.length / pageSize)
+  
   const summary = useMemo(() => {
     const totalIncome = filteredTransactions.filter(t => t.type === 'Income').reduce((acc, t) => acc + t.amount, 0)
     const totalExpense = filteredTransactions.filter(t => t.type === 'Expense').reduce((acc, t) => acc + t.amount, 0)
     return { totalIncome, totalExpense, balance: totalIncome - totalExpense }
   }, [filteredTransactions])
+  
   const accountsSummary = useMemo(() => {
     const map = new Map<string, { account: string; totalIncome: number; totalExpense: number; count: number }>()
     filteredTransactions.forEach(tx => {
@@ -207,14 +236,17 @@ export default function TransactionsPage() {
     result.sort((a, b) => b.net - a.net)
     return result
   }, [filteredTransactions])
+  
   function handleSort(column: keyof Transaction) {
     if (sortBy === column) setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
     else { setSortBy(column); setSortOrder('asc') }
   }
+  
   function renderSortIcon(column: keyof Transaction) {
     if (sortBy !== column) return null
     return sortOrder === 'asc' ? <SortAsc className="ml-1 h-4 w-4" /> : <SortDesc className="ml-1 h-4 w-4" />
   }
+  
   function resetFilters() {
     setSearchTerm('')
     setTypeFilter(null)
@@ -223,6 +255,7 @@ export default function TransactionsPage() {
     setDateRange(undefined)
     setCurrentPage(1)
   }
+  
   function handleExportCSV() {
     try {
       const headers = ['Date','Account','Category','Amount','Type','Payment','Notes','Description']
@@ -253,6 +286,7 @@ export default function TransactionsPage() {
       alert('Error exporting CSV.')
     }
   }
+  
   function toggleRowExpansion(id: string) {
     setExpandedRows(prev => {
       const newSet = new Set(prev)
@@ -260,14 +294,17 @@ export default function TransactionsPage() {
       return newSet
     })
   }
+  
   function handleEdit(tx: Transaction) {
     setSelectedTx(tx)
     setEditModalOpen(true)
   }
+  
   function handleDelete(tx: Transaction) {
     setSelectedTx(tx)
     setDeleteModalOpen(true)
   }
+  
   async function confirmDelete() {
     if (!selectedTx) return
     try {
@@ -279,10 +316,12 @@ export default function TransactionsPage() {
       alert('Error deleting transaction.')
     }
   }
+  
   function openInvoice(tx: Transaction) {
     setSelectedTx(tx)
     setInvoiceModalOpen(true)
   }
+  
   const expenseByCategory = useMemo(() => {
     const map = new Map<string, number>()
     filteredTransactions.forEach(tx => {
@@ -302,6 +341,7 @@ export default function TransactionsPage() {
     }
     return result
   }, [filteredTransactions])
+  
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
@@ -371,6 +411,19 @@ export default function TransactionsPage() {
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="mr-1 h-4 w-4" />Export CSV
             </Button>
+            <select 
+              className="h-9 px-3 py-0 border rounded text-sm bg-background"
+              value={pageSize}
+              onChange={e => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value="10">10 per page</option>
+              <option value="25">25 per page</option>
+              <option value="50">50 per page</option>
+              <option value="100">100 per page</option>
+            </select>
             <Dialog open={openCreateModal} onOpenChange={setOpenCreateModal}>
               <DialogTrigger asChild>
                 <Button variant="default" size="sm">+ New Transaction</Button>
@@ -479,7 +532,7 @@ export default function TransactionsPage() {
                             <Button variant="ghost" size="sm" onClick={() => toggleRowExpansion(tx.id)} className="p-0 h-auto w-6 inline-flex items-center justify-center">
                               {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedTx(tx); setEditModalOpen(true) }} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Edit Transaction">
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Edit Transaction">
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="sm" onClick={() => handleDelete(tx)} className="p-0 h-auto w-6 inline-flex items-center justify-center" title="Delete Transaction">
@@ -518,10 +571,15 @@ export default function TransactionsPage() {
             </Table>
           </div>
           {sortedTransactions.length > pageSize && (
-            <div className="flex justify-center sm:justify-end items-center mt-2 gap-2 p-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Prev</Button>
-              <span className="text-sm">{currentPage} of {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
+            <div className="flex justify-between items-center mt-2 gap-2 p-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {startIndex + 1}-{Math.min(startIndex + pageSize, sortedTransactions.length)} of {sortedTransactions.length} transactions
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Prev</Button>
+                <span className="text-sm">{currentPage} of {totalPages}</span>
+                <Button variant="outline" size="sm" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -599,15 +657,13 @@ export default function TransactionsPage() {
         </DialogContent>
       </Dialog>
 
-      <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
-        <CardHeader className="py-2 px-4 md:px-6">
-          <CardTitle className="text-xl">Expense Distribution</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">Where your expenses are going by category</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {expenseByCategory.length === 0 ? (
-            <p className="text-center text-sm">No expenses found.</p>
-          ) : (
+      {expenseByCategory.length > 0 && (
+        <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
+          <CardHeader className="py-2 px-4 md:px-6">
+            <CardTitle className="text-xl">Expense Distribution</CardTitle>
+            <CardDescription className="text-sm text-muted-foreground">Where your expenses are going by category</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div style={{ width: '100%', height: '300px' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={expenseByCategory} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
@@ -619,9 +675,9 @@ export default function TransactionsPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

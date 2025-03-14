@@ -3,10 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { toast } from '@/components/ui/use-toast';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
-import DashboardTabs from '@/components/dashboard/DashboardTabs';
 import OverviewTab from '@/components/dashboard/tabs/OverviewTab';
-import TransactionsTab from '@/components/dashboard/tabs/TransactionsTab';
-import CategoriesTab from '@/components/dashboard/tabs/CategoriesTab';
 import { getInsights } from '@/utils/dashboard-utils';
 
 interface DashboardPanel {
@@ -17,9 +14,8 @@ interface DashboardPanel {
 }
 
 const Dashboard = () => {
-  const { stats, transactions, refreshData } = useFinance();
+  const { stats, refreshData } = useFinance();
   const [timeRange, setTimeRange] = useState('month');
-  const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
 
@@ -87,40 +83,15 @@ const Dashboard = () => {
         />
       </div>
       
-      <DashboardTabs activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {activeTab === 'overview' && (
-        <OverviewTab
-          stats={stats}
-          panels={panels}
-          setPanels={setPanels}
-          timeRange={timeRange}
-          highlightedCategory={highlightedCategory}
-          setHighlightedCategory={setHighlightedCategory}
-          growingExpense={insights.growingExpense}
-        />
-      )}
-
-      {activeTab === 'transactions' && (
-        <TransactionsTab transactions={transactions || []} />
-      )}
-
-      {activeTab === 'categories' && (
-        <CategoriesTab 
-          categories={stats.byCategory}
-          highlightedCategory={highlightedCategory}
-          setHighlightedCategory={setHighlightedCategory}
-        />
-      )}
-      
-      {activeTab === 'trends' && (
-        <div className="bg-card rounded-xl shadow-sm p-6 text-center">
-          <h2 className="text-xl font-medium mb-4">Spending Trends</h2>
-          <p className="text-muted-foreground">
-            Trend analysis will be added in a future update
-          </p>
-        </div>
-      )}
+      <OverviewTab
+        stats={stats}
+        panels={panels}
+        setPanels={setPanels}
+        timeRange={timeRange}
+        highlightedCategory={highlightedCategory}
+        setHighlightedCategory={setHighlightedCategory}
+        growingExpense={insights.growingExpense}
+      />
     </div>
   );
 };

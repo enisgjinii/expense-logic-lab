@@ -1,304 +1,217 @@
 
-import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CategoryData } from '@/types/finance';
-import { Progress } from '@/components/ui/progress';
+import React, { useState } from 'react';
+import { useFinance } from '@/contexts/FinanceContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardStats } from '@/types/finance';
 import { formatCurrency } from '@/utils/finance-utils';
-import { Button } from '@/components/ui/button';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { ChevronRight, BarChart3, PieChart as PieChartIcon, List } from 'lucide-react';
+import { CircleDollarSign, ArrowUpRight, ArrowDownRight, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+
+interface CategoryItem {
+  category: string;
+  total: number;
+  percentage: number;
+  change?: number;
+}
 
 interface CategoriesTabProps {
-  categories: CategoryData[];
+  categories: CategoryItem[];
   highlightedCategory: string | null;
   setHighlightedCategory: (category: string | null) => void;
 }
 
-// Define colors for the charts
-const COLORS = [
-  '#8B5CF6', '#EC4899', '#F97316', '#22C55E', '#3B82F6', 
-  '#A855F7', '#14B8A6', '#F43F5E', '#FACC15', '#64748B',
-  '#FB923C', '#22D3EE', '#4ADE80', '#F472B6', '#10B981'
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
 const CategoriesTab: React.FC<CategoriesTabProps> = ({ 
   categories, 
-  highlightedCategory, 
-  setHighlightedCategory 
+  highlightedCategory,
+  setHighlightedCategory
 }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'barchart' | 'piechart'>('list');
+  const [activeView, setActiveView] = useState<'chart' | 'list'>('chart');
+  const { stats } = useFinance();
   
-  const sortedCategories = useMemo(() => {
-    return [...categories].sort((a, b) => b.total - a.total);
-  }, [categories]);
-
-  const totalAmount = useMemo(() => {
-    return categories.reduce((sum, category) => sum + category.total, 0);
-  }, [categories]);
-
-  // Calculate top categories for chart visualization
-  const topCategories = useMemo(() => {
-    if (categories.length <= 8) return sortedCategories;
-    
-    const top = sortedCategories.slice(0, 7);
-    const otherSum = sortedCategories.slice(7).reduce((sum, cat) => sum + cat.total, 0);
-    
-    if (otherSum > 0) {
-      top.push({
-        name: 'Other',
-        total: otherSum,
-        percentage: (otherSum / totalAmount) * 100,
-        color: '#64748B'
-      });
-    }
-    
-    return top;
-  }, [sortedCategories, totalAmount, categories]);
-
-  // Prepare chart data
-  const chartData = useMemo(() => {
-    return topCategories.map((category, index) => ({
-      name: category.name,
-      value: category.total,
-      color: category.color || COLORS[index % COLORS.length]
+  const topCategories = [...categories].sort((a, b) => b.total - a.total).slice(0, 5);
+  const totalExpense = categories.reduce((sum, cat) => sum + cat.total, 0);
+  
+  const pieData = categories
+    .sort((a, b) => b.total - a.total)
+    .map((cat, index) => ({
+      name: cat.category,
+      value: cat.total,
+      percentage: ((cat.total / totalExpense) * 100).toFixed(1)
     }));
-  }, [topCategories]);
 
-  // Growth rate analysis - identifying fastest growing categories
-  const growthAnalysis = useMemo(() => {
-    // This is a placeholder - in a real app, you'd compare to previous periods
-    return sortedCategories.slice(0, 3).map(category => ({
-      name: category.name,
-      growth: Math.random() * 30 - 10 // Just a random value between -10% and 20% for demo
+  const barData = categories
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10)
+    .map(cat => ({
+      name: cat.category,
+      amount: cat.total,
     }));
-  }, [sortedCategories]);
-
+  
   return (
     <div className="space-y-6">
-      <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+      <Card className="border shadow-sm bg-card/60 backdrop-blur-sm">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Spending Categories</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">
-            Analyze where your money is going
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Expense Categories</CardTitle>
+            <Tabs defaultValue="chart" className="w-[200px]">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="chart" onClick={() => setActiveView('chart')}>Chart</TabsTrigger>
+                <TabsTrigger value="list" onClick={() => setActiveView('list')}>List</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+          <CardDescription>
+            {highlightedCategory 
+              ? `Details for ${highlightedCategory}` 
+              : 'Breakdown of your spending by category'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium">Top Categories</h3>
-            <div className="flex space-x-1">
-              <Button 
-                variant={viewMode === 'list' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="h-8 px-2"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant={viewMode === 'barchart' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('barchart')}
-                className="h-8 px-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant={viewMode === 'piechart' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setViewMode('piechart')}
-                className="h-8 px-2"
-              >
-                <PieChartIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {viewMode === 'list' && (
-            <div className="space-y-4">
-              {sortedCategories.map((category, index) => (
-                <div key={category.name} className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-3 h-3 rounded-full mr-2" 
-                        style={{ backgroundColor: category.color || COLORS[index % COLORS.length] }}
-                      />
-                      <span 
-                        className={`text-sm font-medium cursor-pointer hover:text-primary transition-colors ${
-                          highlightedCategory === category.name ? 'text-primary font-semibold' : ''
-                        }`}
-                        onClick={() => setHighlightedCategory(
-                          highlightedCategory === category.name ? null : category.name
-                        )}
-                      >
-                        {category.name}
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium">{formatCurrency(category.total)}</span>
-                  </div>
-                  <Progress 
-                    value={category.percentage} 
-                    className="h-2" 
-                    style={{ backgroundColor: `${category.color || COLORS[index % COLORS.length]}30` }}
-                    // Using inline styles for indicator since indicatorStyle is not in props
-                  />
-                  <div className="flex justify-between items-center text-xs text-muted-foreground">
-                    <span>{category.percentage.toFixed(1)}% of total</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {viewMode === 'barchart' && (
-            <div className="h-80 mt-4">
+          {activeView === 'chart' ? (
+            <div className="w-full h-[300px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={70}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    formatter={(value) => formatCurrency(Number(value))} 
-                    labelStyle={{ fontWeight: 'bold' }}
-                  />
-                  <Legend />
-                  <Bar 
-                    dataKey="value" 
-                    fill="#8B5CF6"
-                    radius={[4, 4, 0, 0]}
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={100}
+                    innerRadius={60}
+                    dataKey="value"
+                    nameKey="name"
+                    label={({ name, percentage }) => `${name}: ${percentage}%`}
+                    onClick={(data) => setHighlightedCategory(data.name)}
                   >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {pieData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={COLORS[index % COLORS.length]} 
+                        opacity={highlightedCategory === entry.name ? 1 : highlightedCategory ? 0.4 : 0.8} 
+                        stroke={highlightedCategory === entry.name ? '#fff' : 'none'}
+                        strokeWidth={2}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: number) => formatCurrency(value)}
+                    labelFormatter={(label) => `Category: ${label}`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="w-full h-[300px] mt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Bar 
+                    dataKey="amount" 
+                    fill="#8884d8" 
+                    onClick={(data) => setHighlightedCategory(data.name)} 
+                    cursor="pointer"
+                    barSize={20}
+                  >
+                    {barData.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={COLORS[index % COLORS.length]} 
+                        opacity={highlightedCategory === entry.name ? 1 : highlightedCategory ? 0.4 : 0.8}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
-
-          {viewMode === 'piechart' && (
-            <div className="h-80 mt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={130}
-                    innerRadius={65}
-                    fill="#8B5CF6"
-                    dataKey="value"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          )}
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Category Insights</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground">
-              Quick analysis of your spending patterns
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                <h4 className="font-medium mb-2">Top Spending Category</h4>
-                {sortedCategories.length > 0 && (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-3 h-3 rounded-full mr-2" 
-                        style={{ backgroundColor: sortedCategories[0].color || COLORS[0] }}
-                      />
-                      <span className="font-medium">{sortedCategories[0].name}</span>
-                    </div>
-                    <span className="font-bold">{formatCurrency(sortedCategories[0].total)}</span>
-                  </div>
-                )}
-                <p className="text-sm mt-2 text-muted-foreground">
-                  This category represents {sortedCategories.length > 0 ? sortedCategories[0].percentage.toFixed(1) : 0}% of your total spending
-                </p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {topCategories.map((category) => (
+          <Card 
+            key={category.category} 
+            className={`border shadow-sm bg-card/60 backdrop-blur-sm cursor-pointer transition-all ${
+              highlightedCategory === category.category ? 'ring-2 ring-primary' : ''
+            }`}
+            onClick={() => setHighlightedCategory(category.category)}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center">
+                <CircleDollarSign className="h-4 w-4 mr-2 text-primary" />
+                {category.category}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <span className="text-2xl font-bold">{formatCurrency(category.total)}</span>
+                <span className="text-sm text-muted-foreground">
+                  {((category.total / totalExpense) * 100).toFixed(1)}% of total
+                </span>
               </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium">Fastest Growing Categories</h4>
-                {growthAnalysis.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between bg-muted/30 p-2 rounded">
-                    <span>{item.name}</span>
-                    <span className={item.growth > 0 ? 'text-red-600' : 'text-green-600'}>
-                      {item.growth > 0 ? '↑' : '↓'} {Math.abs(item.growth).toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Spending Recommendations</CardTitle>
-            <CardDescription className="text-sm text-muted-foreground">
-              Ways to optimize your spending
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {sortedCategories.length > 0 && sortedCategories[0].percentage > 30 && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-                  <h4 className="font-medium flex items-center text-amber-800 dark:text-amber-300">
-                    <ChevronRight className="h-5 w-5 mr-1" />
-                    High Concentration Risk
-                  </h4>
-                  <p className="text-sm mt-1 text-muted-foreground">
-                    Your top category ({sortedCategories[0].name}) represents over 30% of your spending. Consider diversifying your expenses.
-                  </p>
+              {category.change !== undefined && (
+                <div className="mt-2 flex items-center text-sm">
+                  {category.change > 0 ? (
+                    <><TrendingUp className="h-4 w-4 mr-1 text-red-500" /> <span className="text-red-500">Increased by {category.change.toFixed(1)}%</span></>
+                  ) : (
+                    <><TrendingDown className="h-4 w-4 mr-1 text-green-500" /> <span className="text-green-500">Decreased by {Math.abs(category.change).toFixed(1)}%</span></>
+                  )}
                 </div>
               )}
-
-              {/* Show some sample recommendations */}
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium flex items-center">
-                  <ChevronRight className="h-5 w-5 mr-1" />
-                  Budget Allocation Suggestion
-                </h4>
-                <p className="text-sm mt-1 text-muted-foreground">
-                  Based on your spending patterns, we recommend allocating no more than 20% of your budget to any single category.
-                </p>
-              </div>
-
-              <div className="rounded-lg border p-4">
-                <h4 className="font-medium flex items-center">
-                  <ChevronRight className="h-5 w-5 mr-1" />
-                  Savings Opportunity
-                </h4>
-                <p className="text-sm mt-1 text-muted-foreground">
-                  Consider setting a monthly budget for each of your top 3 categories to control expenses.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))}
       </div>
+      
+      <Card className="border shadow-sm bg-card/60 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Spending Insights</CardTitle>
+          <CardDescription>Learn where your money is going and how to optimize</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="bg-muted/40 rounded-lg p-4">
+              <h3 className="text-sm font-medium mb-1">Top Expense</h3>
+              <p className="text-xl font-bold">{categories.length > 0 ? categories[0].category : 'N/A'}</p>
+              <p className="text-sm text-muted-foreground">{categories.length > 0 ? formatCurrency(categories[0].total) : '-'}</p>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-4">
+              <h3 className="text-sm font-medium mb-1">Total Categories</h3>
+              <p className="text-xl font-bold">{categories.length}</p>
+              <p className="text-sm text-muted-foreground">Unique spending areas</p>
+            </div>
+            <div className="bg-muted/40 rounded-lg p-4">
+              <h3 className="text-sm font-medium mb-1">Biggest Growth</h3>
+              <p className="text-xl font-bold">{categories.reduce((max, cat) => (cat.change && cat.change > (max?.change || 0)) ? cat : max, { category: 'N/A', total: 0, percentage: 0, change: 0 }).category}</p>
+              <p className="text-sm text-muted-foreground">Fastest growing expense</p>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Spending Tips</h3>
+            <ul className="space-y-2 text-sm">
+              <li className="flex items-start">
+                <ChevronRight className="h-4 w-4 mr-2 mt-0.5 text-primary" />
+                <span>Focus on your top spending categories to make the biggest impact on your savings.</span>
+              </li>
+              <li className="flex items-start">
+                <ChevronRight className="h-4 w-4 mr-2 mt-0.5 text-primary" />
+                <span>Set budget limits for categories that have been growing consistently.</span>
+              </li>
+              <li className="flex items-start">
+                <ChevronRight className="h-4 w-4 mr-2 mt-0.5 text-primary" />
+                <span>Consider tracking smaller purchases - they often add up to significant amounts over time.</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
