@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { languages, Language } from '@/locales';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,7 +22,8 @@ import {
   RefreshCw,
   Sun,
   Palette,
-  CreditCard
+  CreditCard,
+  Globe
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +32,7 @@ import SubscriptionPlans from '@/components/SubscriptionPlans';
 
 const Settings = () => {
   const { themeMode, setThemeMode, user, clearData, refreshData, exportData } = useFinance();
+  const { language, setLanguage, t } = useLanguage();
   const [activeTab, setActiveTab] = useState('appearance');
   
   // Firebase config state
@@ -145,11 +149,14 @@ const Settings = () => {
       case 'Import':
         localStorage.setItem('financeTrackerImportSettings', JSON.stringify(importSettings));
         break;
+      case 'Language':
+        // Language is handled by the context
+        break;
     }
     
     toast({
-      title: `${type} settings updated`,
-      description: `Your ${type.toLowerCase()} settings have been updated successfully.`
+      title: t('settings.settingsUpdated'),
+      description: `${t(`settings.${type.toLowerCase()}Updated`)}`
     });
   };
   
@@ -224,27 +231,31 @@ const Settings = () => {
     <div className="space-y-6 pb-10 animate-in">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage your account settings and preferences</p>
+          <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
+          <p className="text-muted-foreground">{t('settings.subtitle')}</p>
         </div>
         <Badge variant="outline" className="px-2 py-1">
-          {user ? 'Personal account' : 'Not logged in'}
+          {user ? t('settings.personalAccount') : t('settings.notLoggedIn')}
         </Badge>
       </div>
 
       <Tabs defaultValue="appearance" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-3 lg:w-[600px]">
+        <TabsList className="grid grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
-            <span>Appearance</span>
+            <span>{t('settings.appearance')}</span>
+          </TabsTrigger>
+          <TabsTrigger value="language" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            <span>{t('settings.language')}</span>
           </TabsTrigger>
           <TabsTrigger value="firebase" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
-            <span>Firebase</span>
+            <span>{t('settings.firebase')}</span>
           </TabsTrigger>
           <TabsTrigger value="subscription" className="flex items-center gap-2">
             <CreditCard className="h-4 w-4" />
-            <span>Subscription</span>
+            <span>{t('settings.subscription')}</span>
           </TabsTrigger>
         </TabsList>
         
@@ -254,15 +265,15 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                Appearance Settings
+                {t('settings.appearance')}
               </CardTitle>
               <CardDescription>
-                Customize how the app looks and feels
+                {t('settings.appearanceDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Theme</h3>
+                <h3 className="text-lg font-medium">{t('settings.theme')}</h3>
                 <div className="grid grid-cols-3 gap-4">
                   <Button 
                     variant="outline" 
@@ -270,7 +281,7 @@ const Settings = () => {
                     onClick={() => setThemeMode('light')}
                   >
                     <Sun className="h-6 w-6" />
-                    <span>Light</span>
+                    <span>{t('settings.light')}</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -278,7 +289,7 @@ const Settings = () => {
                     onClick={() => setThemeMode('dark')}
                   >
                     <Moon className="h-6 w-6" />
-                    <span>Dark</span>
+                    <span>{t('settings.dark')}</span>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -286,7 +297,7 @@ const Settings = () => {
                     onClick={() => setThemeMode('system')}
                   >
                     <Laptop className="h-6 w-6" />
-                    <span>System</span>
+                    <span>{t('settings.system')}</span>
                   </Button>
                 </div>
               </div>
@@ -294,7 +305,7 @@ const Settings = () => {
               <Separator />
               
               <div className="space-y-4">
-                <h3 className="text-lg font-medium">Display Options</h3>
+                <h3 className="text-lg font-medium">{t('settings.displayOptions')}</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
@@ -368,23 +379,82 @@ const Settings = () => {
           </Card>
         </TabsContent>
         
+        {/* Language Settings */}
+        <TabsContent value="language" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                {t('settings.languageSettings')}
+              </CardTitle>
+              <CardDescription>
+                {t('settings.languageDescription')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <Label htmlFor="language-select">{t('settings.selectLanguage')}</Label>
+                <Select 
+                  value={language} 
+                  onValueChange={(value: Language) => setLanguage(value)}
+                >
+                  <SelectTrigger id="language-select" className="w-full">
+                    <SelectValue placeholder={t('settings.selectLanguage')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(languages).map(([code, lang]) => (
+                      <SelectItem key={code} value={code as Language}>
+                        <div className="flex items-center gap-2">
+                          <span>{lang.nativeName}</span>
+                          <span className="text-muted-foreground">({lang.name})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="rounded-lg bg-muted p-4">
+                <div className="flex gap-2 items-start">
+                  <Info className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">{t('settings.language')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('settings.languageSelectedInfo')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button 
+                  onClick={() => handleUpdateSettings('Language')}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {t('settings.saveChanges')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         {/* Firebase Settings */}
         <TabsContent value="firebase" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Database className="h-5 w-5" />
-                Firebase Configuration
+                {t('settings.firebase')}
               </CardTitle>
               <CardDescription>
-                Set up your Firebase project for data storage and authentication
+                {t('settings.firebaseDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
                 <Info className="h-5 w-5 text-amber-500" />
                 <p className="text-sm text-amber-800 dark:text-amber-300">
-                  Your Firebase credentials are used to connect to your Firebase project. These settings are stored locally.
+                  {t('settings.firebaseInfo')}
                 </p>
               </div>
               
@@ -475,7 +545,7 @@ const Settings = () => {
           <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
             <Info className="h-5 w-5 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
-              Need help setting up Firebase? <a href="https://firebase.google.com/docs/web/setup" target="_blank" rel="noopener noreferrer" className="text-primary underline">Check the documentation</a>.
+              {t('settings.firebaseHelp')}
             </p>
           </div>
         </TabsContent>
@@ -486,10 +556,10 @@ const Settings = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Subscription Plans
+                {t('settings.subscription')}
               </CardTitle>
               <CardDescription>
-                Upgrade your account to access premium features
+                {t('settings.subscriptionDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
