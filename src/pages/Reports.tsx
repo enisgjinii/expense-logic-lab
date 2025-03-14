@@ -1,772 +1,611 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useFinance } from '@/contexts/FinanceContext'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import DateRangePicker from '@/components/DateRangePicker'
-import { DateRange } from 'react-day-picker'
+import React, { useState, useMemo } from 'react';
+import { useFinance } from '@/contexts/FinanceContext';
 import {
-  PieChart as RePieChart,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar } from '@/components/ui/calendar';
+import { DateRange } from 'react-day-picker';
+import { formatDate, formatCurrency } from '@/utils/finance-utils';
+import { 
+  BarChart,
+  Bar,
+  PieChart,
   Pie,
   LineChart,
   Line,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell
-} from 'recharts'
+} from 'recharts';
 import {
   Download,
-  Filter,
-  ArrowUpDown,
-  BarChart2,
-  PieChart as PieChartIcon,
+  Calendar as CalendarIcon,
+  ArrowDownUp,
   TrendingUp,
-  RefreshCw
-} from 'lucide-react'
-import {
-  format,
-  subDays,
-  parse,
-  isWithinInterval
-} from 'date-fns'
-import { Transaction } from '@/types/finance'
+  PieChart as PieChartIcon,
+  BarChart3,
+  FileText,
+  ArrowRight,
+  Check
+} from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { addDays, format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
-function cn(...classes: any[]) {
-  return classes.filter(Boolean).join(' ')
-}
-
-const getRandomColor = () => {
-  const colors = [
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-    '#FF9F40', '#8AC926', '#6A4C93', '#1982C4', '#FFCA3A',
-    '#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93'
-  ]
-  return colors[Math.floor(Math.random() * colors.length)]
-}
+const COLORS = [
+  '#8B5CF6', '#EC4899', '#F97316', '#22C55E', '#3B82F6', 
+  '#A855F7', '#14B8A6', '#F43F5E', '#FACC15', '#64748B',
+  '#FB923C', '#22D3EE', '#4ADE80', '#F472B6', '#10B981'
+];
 
 const Reports = () => {
-  const { transactions } = useFinance()
-  const [activeTab, setActiveTab] = useState<'overview' | 'advanced'>('overview')
+  const { transactions, stats, exportData } = useFinance();
+  const [reportType, setReportType] = useState('expense-category');
+  const [timeframe, setTimeframe] = useState('month');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date()
-  })
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([])
-  const [categoryData, setCategoryData] = useState<any[]>([])
-  const [accountData, setAccountData] = useState<any[]>([])
-  const [timeframeData, setTimeframeData] = useState<any[]>([])
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  const [accountFilter, setAccountFilter] = useState<string>('all')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [timeframe, setTimeframe] = useState<'daily' | 'weekly' | 'monthly'>('monthly')
-  const [searchTerm, setSearchTerm] = useState<string>('')
-  const uniqueCategories = Array.from(new Set(transactions.map(t => t.category))).sort()
-  const uniqueAccounts = Array.from(new Set(transactions.map(t => t.account))).sort()
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
 
-  useEffect(() => {
-    if (!transactions.length) return
-    let filtered = [...transactions]
-    if (dateRange?.from && dateRange?.to) {
-      filtered = filtered.filter(t =>
-        isWithinInterval(new Date(t.date), {
-          start: dateRange.from as Date,
-          end: dateRange.to as Date
-        })
-      )
+  const handleTimeframeChange = (newTimeframe: string) => {
+    setTimeframe(newTimeframe);
+    
+    switch(newTimeframe) {
+      case 'month':
+        setDateRange({
+          from: startOfMonth(new Date()),
+          to: endOfMonth(new Date())
+        });
+        break;
+      case 'quarter':
+        setDateRange({
+          from: startOfMonth(subMonths(new Date(), 2)),
+          to: endOfMonth(new Date())
+        });
+        break;
+      case 'year':
+        setDateRange({
+          from: startOfYear(new Date()),
+          to: endOfYear(new Date())
+        });
+        break;
+      case 'custom':
+        break;
     }
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(t => t.category === categoryFilter)
-    }
-    if (accountFilter !== 'all') {
-      filtered = filtered.filter(t => t.account === accountFilter)
-    }
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(t => t.type === typeFilter)
-    }
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(t =>
-        t.description?.toLowerCase().includes(term) ||
-        t.notes?.toLowerCase().includes(term) ||
-        t.category.toLowerCase().includes(term) ||
-        t.account.toLowerCase().includes(term) ||
-        t.merchant?.toLowerCase().includes(term)
-      )
-    }
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.date).getTime()
-      const dateB = new Date(b.date).getTime()
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA
-    })
-    setFilteredTransactions(filtered)
-    prepareChartData(filtered)
-  }, [
-    transactions,
-    dateRange,
-    categoryFilter,
-    accountFilter,
-    typeFilter,
-    sortOrder,
-    searchTerm,
-    timeframe
-  ])
+  };
 
-  const prepareChartData = (filtered: Transaction[]) => {
-    const categoryMap = new Map<string, number>()
-    filtered.forEach(t => {
-      const amt = t.type === 'Expense' ? -t.amount : t.amount
-      const c = t.category || 'Uncategorized'
-      categoryMap.set(c, (categoryMap.get(c) || 0) + amt)
-    })
-    const categoryChartData = Array.from(categoryMap.entries()).map(([name, value]) => ({
-      name,
-      value: Math.abs(value),
-      color: getRandomColor()
-    }))
-    setCategoryData(categoryChartData)
-
-    const accountMap = new Map<string, number>()
-    filtered.forEach(t => {
-      const amt = t.type === 'Expense' ? -t.amount : t.amount
-      const a = t.account || 'Unknown'
-      accountMap.set(a, (accountMap.get(a) || 0) + amt)
-    })
-    const accountChartData = Array.from(accountMap.entries()).map(([name, value]) => ({
-      name,
-      value,
-      color: getRandomColor()
-    }))
-    setAccountData(accountChartData)
-
-    const timeMap = new Map<string, { income: number; expense: number; balance: number }>()
-    const formatStr = timeframe === 'daily' ? 'yyyy-MM-dd' : timeframe === 'weekly' ? 'yyyy-ww' : 'yyyy-MM'
-    filtered.forEach(t => {
-      const d = new Date(t.date)
-      let group = ''
-      if (timeframe === 'daily') group = format(d, 'yyyy-MM-dd')
-      else if (timeframe === 'weekly') group = format(d, 'yyyy-ww')
-      else group = format(d, 'yyyy-MM')
-      if (!timeMap.has(group)) {
-        timeMap.set(group, { income: 0, expense: 0, balance: 0 })
+  const filteredTransactions = useMemo(() => {
+    if (!dateRange?.from) return transactions;
+    
+    return transactions.filter(tx => {
+      const txDate = new Date(tx.date);
+      
+      if (dateRange.from && dateRange.to) {
+        return txDate >= dateRange.from && txDate <= dateRange.to;
+      } else if (dateRange.from) {
+        return txDate >= dateRange.from;
       }
-      const current = timeMap.get(group)!
-      if (t.type === 'Income') {
-        current.income += t.amount
-        current.balance += t.amount
-      } else {
-        current.expense += t.amount
-        current.balance -= t.amount
+      
+      return true;
+    });
+  }, [transactions, dateRange]);
+
+  const expenseByCategoryData = useMemo(() => {
+    const categoryMap = new Map<string, number>();
+    
+    filteredTransactions
+      .filter(tx => tx.type === 'Expense')
+      .forEach(tx => {
+        const category = tx.category || 'Uncategorized';
+        categoryMap.set(category, (categoryMap.get(category) || 0) + tx.amount);
+      });
+    
+    let result = Array.from(categoryMap.entries())
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: COLORS[index % COLORS.length]
+      }))
+      .sort((a, b) => b.value - a.value);
+    
+    if (result.length > 10) {
+      const topCategories = result.slice(0, 9);
+      const otherSum = result.slice(9).reduce((sum, item) => sum + item.value, 0);
+      
+      topCategories.push({
+        name: 'Other',
+        value: otherSum,
+        color: '#64748B'
+      });
+      
+      result = topCategories;
+    }
+    
+    return result;
+  }, [filteredTransactions]);
+
+  const incomeVsExpenseData = useMemo(() => {
+    const monthlyData = new Map<string, { month: string, income: number, expense: number }>();
+    
+    filteredTransactions.forEach(tx => {
+      const date = new Date(tx.date);
+      const monthKey = format(date, 'yyyy-MM');
+      const monthLabel = format(date, 'MMM yyyy');
+      
+      if (!monthlyData.has(monthKey)) {
+        monthlyData.set(monthKey, { month: monthLabel, income: 0, expense: 0 });
       }
-      timeMap.set(group, current)
-    })
-    const chartData = Array.from(timeMap.entries())
-      .map(([time, data]) => {
-        let displayTime = ''
-        if (timeframe === 'daily') {
-          displayTime = format(parse(time, 'yyyy-MM-dd', new Date()), 'MMM dd')
-        } else if (timeframe === 'weekly') {
-          const [year, week] = time.split('-')
-          displayTime = `Week ${week}`
-        } else {
-          displayTime = format(parse(time + '-01', 'yyyy-MM-dd', new Date()), 'MMM yyyy')
+      
+      const data = monthlyData.get(monthKey)!;
+      
+      if (tx.type === 'Income') {
+        data.income += tx.amount;
+      } else if (tx.type === 'Expense') {
+        data.expense += tx.amount;
+      }
+    });
+    
+    return Array.from(monthlyData.values())
+      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+  }, [filteredTransactions]);
+
+  const summary = useMemo(() => {
+    const totalIncome = filteredTransactions
+      .filter(tx => tx.type === 'Income')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+      
+    const totalExpense = filteredTransactions
+      .filter(tx => tx.type === 'Expense')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    
+    const balance = totalIncome - totalExpense;
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpense) / totalIncome) * 100 : 0;
+    
+    return {
+      totalIncome,
+      totalExpense,
+      balance,
+      savingsRate,
+      transactionCount: filteredTransactions.length
+    };
+  }, [filteredTransactions]);
+
+  const spendingTrendData = useMemo(() => {
+    const dailyData = new Map<string, { date: string, amount: number }>();
+    
+    filteredTransactions
+      .filter(tx => tx.type === 'Expense')
+      .forEach(tx => {
+        const date = new Date(tx.date);
+        const dateKey = format(date, 'yyyy-MM-dd');
+        const dateLabel = format(date, 'MMM dd');
+        
+        if (!dailyData.has(dateKey)) {
+          dailyData.set(dateKey, { date: dateLabel, amount: 0 });
         }
-        return { time: displayTime, income: data.income, expense: data.expense, balance: data.balance }
-      })
-      .sort((a, b) => a.time.localeCompare(b.time))
-    setTimeframeData(chartData)
-  }
+        
+        dailyData.get(dateKey)!.amount += tx.amount;
+      });
+    
+    return Array.from(dailyData.values())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [filteredTransactions]);
 
-  const formatCurrency = (amt: number) => new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amt)
+  const handleExportCSV = () => {
+    const csvContent = exportData();
+    if (csvContent) {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'finance_report.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
-  const totalIncome = useMemo(
-    () => filteredTransactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0),
-    [filteredTransactions]
-  )
-  const totalExpense = useMemo(
-    () => filteredTransactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0),
-    [filteredTransactions]
-  )
-  const netBalance = totalIncome - totalExpense
-
-  const renderCustomizedLabel = ({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(0)}%`
-
-  const resetFilters = () => {
-    setCategoryFilter('all')
-    setAccountFilter('all')
-    setTypeFilter('all')
-    setSortOrder('desc')
-    setSearchTerm('')
-    setDateRange({ from: subDays(new Date(), 30), to: new Date() })
-  }
-
-  const exportReport = () => {
-    const headers = ['Date', 'Type', 'Category', 'Account', 'Amount', 'Merchant', 'Description', 'Notes']
-    const rows = filteredTransactions.map(t => [
-      t.date,
-      t.type,
-      t.category,
-      t.account,
-      t.amount,
-      t.merchant || '',
-      t.description || '',
-      t.notes || ''
-    ])
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map(r => r.map(v => `"${v || ''}"`).join(','))].join('\n')
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `financial-report-${Date.now()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
+  const formatDateRange = () => {
+    if (!dateRange?.from) return 'All time';
+    
+    const from = format(dateRange.from, 'MMM d, yyyy');
+    
+    if (!dateRange.to) return `Since ${from}`;
+    
+    const to = format(dateRange.to, 'MMM d, yyyy');
+    return `${from} - ${to}`;
+  };
 
   return (
-    <div className="max-w-7xl mx-auto p-2 sm:p-4 space-y-4 sm:space-y-6 pb-8 animate-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="container mx-auto p-4 space-y-8 max-w-7xl animate-in">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Financial Reports</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Analyze your transactions and financial patterns
-          </p>
+          <h1 className="text-2xl font-bold">Financial Reports</h1>
+          <p className="text-muted-foreground">Analyze your financial data with interactive reports</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={resetFilters}
-            className="flex gap-2 items-center text-xs sm:text-sm"
-          >
-            <RefreshCw className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Reset</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={exportReport}
-            className="flex gap-2 items-center text-xs sm:text-sm"
-          >
-            <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline">Export</span>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="justify-between text-left font-normal w-full sm:w-[240px]">
+                <div className="flex items-center">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formatDateRange()}
+                </div>
+                <ArrowDownUp className="h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="flex flex-col sm:flex-row">
+                <div className="border-b sm:border-b-0 sm:border-r border-muted p-2 space-y-2">
+                  <Button
+                    variant={timeframe === 'month' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => handleTimeframeChange('month')}
+                  >
+                    This Month
+                  </Button>
+                  <Button
+                    variant={timeframe === 'quarter' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => handleTimeframeChange('quarter')}
+                  >
+                    Last 3 Months
+                  </Button>
+                  <Button
+                    variant={timeframe === 'year' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => handleTimeframeChange('year')}
+                  >
+                    This Year
+                  </Button>
+                  <Button
+                    variant={timeframe === 'custom' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => handleTimeframeChange('custom')}
+                  >
+                    Custom Range
+                  </Button>
+                </div>
+                
+                <div className="p-2">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={dateRange?.from}
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={1}
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
           </Button>
         </div>
       </div>
-      <Card className="mb-4 sm:mb-6 overflow-hidden">
-        <CardHeader className="pb-2 sm:pb-3">
-          <CardTitle className="text-base sm:text-lg">Filter Options</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Customize your report view</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="date-range" className="text-xs sm:text-sm">
-                Date Range
-              </Label>
-              <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="category" className="text-xs sm:text-sm">
-                Category
-              </Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger id="category" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map(c => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="account" className="text-xs sm:text-sm">
-                Account
-              </Label>
-              <Select value={accountFilter} onValueChange={setAccountFilter}>
-                <SelectTrigger id="account" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Accounts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Accounts</SelectItem>
-                  {uniqueAccounts.map(a => (
-                    <SelectItem key={a} value={a}>
-                      {a}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="type" className="text-xs sm:text-sm">
-                Transaction Type
-              </Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger id="type" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Income">Income</SelectItem>
-                  <SelectItem value="Expense">Expense</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="search" className="text-xs sm:text-sm">
-                Search Transactions
-              </Label>
-              <Input
-                id="search"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search by description, category, etc."
-                className="text-xs sm:text-sm"
-              />
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="timeframe" className="text-xs sm:text-sm">
-                Time Grouping
-              </Label>
-              <Select value={timeframe} onValueChange={v => setTimeframe(v as 'daily' | 'weekly' | 'monthly')}>
-                <SelectTrigger id="timeframe" className="text-xs sm:text-sm">
-                  <SelectValue placeholder="Select timeframe" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:space-y-2">
-              <Label htmlFor="sort" className="text-xs sm:text-sm">
-                Sort Order
-              </Label>
-              <Button
-                variant="outline"
-                className="w-full justify-between text-xs sm:text-sm"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                Date {sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}
-                <ArrowUpDown className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      {filteredTransactions.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground text-sm sm:text-base">
-              No transactions found matching the current filters.
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Income</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalIncome)}</div>
+            <p className="text-sm text-muted-foreground">
+              From {filteredTransactions.filter(tx => tx.type === 'Income').length} transactions
             </p>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <Card className="bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900/50">
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400">
-                      Total Income
-                    </p>
-                    <h3 className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-300">
-                      {formatCurrency(totalIncome)}
-                    </h3>
+        
+        <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Expenses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalExpense)}</div>
+            <p className="text-sm text-muted-foreground">
+              From {filteredTransactions.filter(tx => tx.type === 'Expense').length} transactions
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">Balance</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${summary.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              {formatCurrency(summary.balance)}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Savings rate: {summary.savingsRate.toFixed(1)}%
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+      
+      <Tabs defaultValue="expense-category" value={reportType} onValueChange={setReportType} className="w-full">
+        <div className="flex justify-between items-center mb-4">
+          <TabsList className="grid grid-cols-3 w-full max-w-md">
+            <TabsTrigger value="expense-category" className="flex items-center gap-1">
+              <PieChartIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Categories</span>
+            </TabsTrigger>
+            <TabsTrigger value="income-expense" className="flex items-center gap-1">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Income/Expense</span>
+            </TabsTrigger>
+            <TabsTrigger value="spending-trend" className="flex items-center gap-1">
+              <TrendingUp className="h-4 w-4" />
+              <span className="hidden sm:inline">Trends</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        
+        <TabsContent value="expense-category" className="mt-0">
+          <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle>Expense by Category</CardTitle>
+              <CardDescription>
+                Breakdown of expenses across different categories during {formatDateRange()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {expenseByCategoryData.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseByCategoryData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          innerRadius={60}
+                          fill="#8B5CF6"
+                          dataKey="value"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        >
+                          {expenseByCategoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="p-2 sm:p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                    <TrendingUp className="h-4 w-4 sm:h-6 sm:w-6 text-green-600 dark:text-green-400" />
+                  
+                  <div className="space-y-4 overflow-y-auto max-h-[350px] pr-2">
+                    {expenseByCategoryData.map((category, index) => (
+                      <div key={index} className="flex items-center justify-between pb-2 border-b">
+                        <div className="flex items-center">
+                          <div 
+                            className="w-3 h-3 rounded-full mr-2" 
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <span className="font-medium">{category.name}</span>
+                        </div>
+                        <span className="font-medium">
+                          {formatCurrency(category.value)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900/50">
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium text-red-600 dark:text-red-400">
-                      Total Expenses
-                    </p>
-                    <h3 className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-300">
-                      {formatCurrency(totalExpense)}
-                    </h3>
-                  </div>
-                  <div className="p-2 sm:p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
-                    <BarChart2 className="h-4 w-4 sm:h-6 sm:w-6 text-red-600 dark:text-red-400" />
-                  </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No expense data available for this period.</p>
                 </div>
-              </CardContent>
-            </Card>
-            <Card
-              className={cn(
-                'border',
-                netBalance >= 0
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900/50'
-                  : 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50'
               )}
-            >
-              <CardContent className="pt-4 sm:pt-6">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p
-                      className={cn(
-                        'text-xs sm:text-sm font-medium',
-                        netBalance >= 0
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-amber-600 dark:text-amber-400'
-                      )}
-                    >
-                      Net Balance
-                    </p>
-                    <h3
-                      className={cn(
-                        'text-lg sm:text-2xl font-bold',
-                        netBalance >= 0
-                          ? 'text-blue-700 dark:text-blue-300'
-                          : 'text-amber-700 dark:text-amber-300'
-                      )}
-                    >
-                      {formatCurrency(netBalance)}
-                    </h3>
-                  </div>
-                  <div
-                    className={cn(
-                      'p-2 sm:p-3 rounded-full',
-                      netBalance >= 0
-                        ? 'bg-blue-100 dark:bg-blue-900/30'
-                        : 'bg-amber-100 dark:bg-amber-900/30'
-                    )}
-                  >
-                    <PieChartIcon
-                      className={cn(
-                        'h-4 w-4 sm:h-6 sm:w-6',
-                        netBalance >= 0
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-amber-600 dark:text-amber-400'
-                      )}
-                    />
-                  </div>
+            </CardContent>
+            <CardFooter>
+              <p className="text-sm text-muted-foreground">
+                Total expenses for this period: {formatCurrency(summary.totalExpense)}
+              </p>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="income-expense" className="mt-0">
+          <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle>Income vs Expenses</CardTitle>
+              <CardDescription>
+                Monthly comparison of income and expenses during {formatDateRange()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {incomeVsExpenseData.length > 0 ? (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={incomeVsExpenseData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Legend />
+                      <Bar dataKey="income" name="Income" fill="#22C55E" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="expense" name="Expense" fill="#F43F5E" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </CardContent>
-            </Card>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No data available for this period.</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+              <div className="flex items-center gap-4 mb-2 sm:mb-0">
+                <Badge variant="outline" className="px-2 py-1 flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2" />
+                  <span>Income: {formatCurrency(summary.totalIncome)}</span>
+                </Badge>
+                <Badge variant="outline" className="px-2 py-1 flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-2" />
+                  <span>Expense: {formatCurrency(summary.totalExpense)}</span>
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Net balance: {formatCurrency(summary.balance)}
+              </p>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="spending-trend" className="mt-0">
+          <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+            <CardHeader>
+              <CardTitle>Spending Trend</CardTitle>
+              <CardDescription>
+                Daily expense pattern during {formatDateRange()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {spendingTrendData.length > 0 ? (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={spendingTrendData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="amount" 
+                        name="Daily Expenses" 
+                        stroke="#8B5CF6" 
+                        strokeWidth={2}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No expense data available for this period.</p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <p className="text-sm text-muted-foreground">
+                Average daily expense: {formatCurrency(spendingTrendData.length > 0 
+                  ? spendingTrendData.reduce((sum, day) => sum + day.amount, 0) / spendingTrendData.length 
+                  : 0)}
+              </p>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+      </Tabs>
+      
+      <Card className="border bg-card/60 backdrop-blur-sm shadow-sm">
+        <CardHeader>
+          <CardTitle>Financial Insights</CardTitle>
+          <CardDescription>
+            Key observations from your financial data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg border p-4">
+              <h4 className="font-medium flex items-center mb-2">
+                <Check className="h-5 w-5 mr-2 text-green-500" />
+                Savings Rate
+              </h4>
+              <p className="text-sm text-muted-foreground mb-2">
+                Your savings rate is {summary.savingsRate.toFixed(1)}% for this period.
+              </p>
+              {summary.savingsRate >= 20 ? (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Excellent</Badge>
+              ) : summary.savingsRate >= 10 ? (
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">Good</Badge>
+              ) : summary.savingsRate > 0 ? (
+                <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">Fair</Badge>
+              ) : (
+                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">Needs Improvement</Badge>
+              )}
+            </div>
+            
+            <div className="rounded-lg border p-4">
+              <h4 className="font-medium flex items-center mb-2">
+                <FileText className="h-5 w-5 mr-2 text-blue-500" />
+                Transaction Summary
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                You had a total of {summary.transactionCount} transactions in this period:
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  {filteredTransactions.filter(tx => tx.type === 'Income').length} Income
+                </Badge>
+                <Badge variant="outline">
+                  {filteredTransactions.filter(tx => tx.type === 'Expense').length} Expense
+                </Badge>
+                <Badge variant="outline">
+                  {filteredTransactions.filter(tx => tx.type === 'Transfer').length} Transfer
+                </Badge>
+              </div>
+            </div>
+            
+            {expenseByCategoryData.length > 0 && (
+              <div className="rounded-lg border p-4">
+                <h4 className="font-medium flex items-center mb-2">
+                  <PieChartIcon className="h-5 w-5 mr-2 text-purple-500" />
+                  Top Expense Category
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  Your largest expense category is <strong>{expenseByCategoryData[0].name}</strong> at {formatCurrency(expenseByCategoryData[0].value)}.
+                </p>
+                <Button variant="link" className="p-0 h-auto mt-1 text-sm" onClick={() => setReportType('expense-category')}>
+                  View category breakdown <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
+            )}
+            
+            {incomeVsExpenseData.length > 0 && (
+              <div className="rounded-lg border p-4">
+                <h4 className="font-medium flex items-center mb-2">
+                  <TrendingUp className="h-5 w-5 mr-2 text-red-500" />
+                  Income vs Expense Trend
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {summary.balance >= 0 
+                    ? `You're saving money overall with a positive balance of ${formatCurrency(summary.balance)}.`
+                    : `You're spending more than you earn with a negative balance of ${formatCurrency(Math.abs(summary.balance))}.`
+                  }
+                </p>
+                <Button variant="link" className="p-0 h-auto mt-1 text-sm" onClick={() => setReportType('income-expense')}>
+                  View income/expense comparison <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
+            )}
           </div>
-          <Tabs
-            defaultValue="overview"
-            value={activeTab}
-            onValueChange={v => setActiveTab(v as 'overview' | 'advanced')}
-          >
-            <TabsList className="grid grid-cols-2 mb-4 sm:mb-6">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="advanced" className="text-xs sm:text-sm">
-                Advanced Analysis
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Spending by Category</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      Distribution of expenses across categories
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {categoryData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RePieChart>
-                            <Pie
-                              data={categoryData}
-                              dataKey="value"
-                              cx="50%"
-                              cy="50%"
-                              labelLine
-                              label={renderCustomizedLabel}
-                              outerRadius={window.innerWidth < 640 ? 70 : 100}
-                              fill="#8884d8"
-                            >
-                              {categoryData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend
-                              layout={window.innerWidth < 640 ? 'horizontal' : 'vertical'}
-                              verticalAlign="bottom"
-                              align="center"
-                            />
-                          </RePieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">
-                            No category data available
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Cash Flow Over Time</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      Income vs expenses over the selected period
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {timeframeData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={timeframeData}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 20 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="time"
-                              tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend
-                              wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <Bar dataKey="income" name="Income" fill="#4BC0C0" />
-                            <Bar dataKey="expense" name="Expense" fill="#FF6384" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">
-                            No time-based data available
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="lg:col-span-2">
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Balance Trend</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      How your balance changed over time
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {timeframeData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={timeframeData}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 20 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="time"
-                              tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend
-                              wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="balance"
-                              name="Balance"
-                              stroke="#8884d8"
-                              activeDot={{ r: 8 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">
-                            No balance trend data available
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            <TabsContent value="advanced" className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Account Distribution</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      How your money is distributed among accounts
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {accountData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RePieChart>
-                            <Pie
-                              data={accountData}
-                              dataKey="value"
-                              cx="50%"
-                              cy="50%"
-                              labelLine
-                              label={renderCustomizedLabel}
-                              outerRadius={window.innerWidth < 640 ? 70 : 100}
-                              fill="#8884d8"
-                            >
-                              {accountData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend
-                              layout={window.innerWidth < 640 ? 'horizontal' : 'vertical'}
-                              verticalAlign="bottom"
-                              align="center"
-                            />
-                          </RePieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">
-                            No account data available
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Income vs Expense</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      Compare income and expenses
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[200px] sm:h-[300px] w-full overflow-x-auto">
-                      {filteredTransactions.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={[
-                              { name: 'Income', amount: totalIncome, fill: '#4BC0C0' },
-                              { name: 'Expenses', amount: totalExpense, fill: '#FF6384' }
-                            ]}
-                            margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="name"
-                              tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <YAxis tick={{ fontSize: window.innerWidth < 640 ? 10 : 12 }} />
-                            <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
-                            <Legend
-                              wrapperStyle={{ fontSize: window.innerWidth < 640 ? 10 : 12 }}
-                            />
-                            <Bar dataKey="amount" name="Amount">
-                              {[
-                                { name: 'Income', amount: totalIncome, fill: '#4BC0C0' },
-                                { name: 'Expenses', amount: totalExpense, fill: '#FF6384' }
-                              ].map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <p className="text-muted-foreground text-xs sm:text-sm">No data available</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="lg:col-span-2">
-                  <CardHeader className="pb-2 sm:pb-4">
-                    <CardTitle className="text-base sm:text-lg">Transaction Statistics</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      Key metrics about your transactions
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          Total Transactions
-                        </p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {filteredTransactions.length}
-                        </h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          Avg. Transaction
-                        </p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(
-                            filteredTransactions.length
-                              ? filteredTransactions.reduce((sum, t) => sum + t.amount, 0) /
-                                  filteredTransactions.length
-                              : 0
-                          )}
-                        </h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Largest Expense</p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(
-                            Math.max(
-                              ...filteredTransactions.filter(t => t.type === 'Expense').map(t => t.amount),
-                              0
-                            )
-                          )}
-                        </h4>
-                      </div>
-                      <div className="bg-muted rounded-lg p-3 sm:p-4 text-center">
-                        <p className="text-xs sm:text-sm text-muted-foreground">Largest Income</p>
-                        <h4 className="text-base sm:text-2xl font-bold">
-                          {formatCurrency(
-                            Math.max(
-                              ...filteredTransactions.filter(t => t.type === 'Income').map(t => t.amount),
-                              0
-                            )
-                          )}
-                        </h4>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </>
-      )}
-  </div>
-  )
-}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
-export default Reports
+export default Reports;

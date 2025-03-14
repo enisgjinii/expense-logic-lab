@@ -17,7 +17,7 @@ interface DashboardPanel {
 }
 
 const Dashboard = () => {
-  const { stats, refreshData } = useFinance();
+  const { stats, transactions, refreshData } = useFinance();
   const [timeRange, setTimeRange] = useState('month');
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -102,7 +102,7 @@ const Dashboard = () => {
       )}
 
       {activeTab === 'transactions' && (
-        <TransactionsTab transactions={stats.recentTransactions} />
+        <TransactionsTab transactions={transactions || []} />
       )}
 
       {activeTab === 'categories' && (
