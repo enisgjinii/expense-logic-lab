@@ -65,17 +65,34 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Doughnut, Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js'
+import { motion } from 'framer-motion'
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement)
 
+// Extend the Budget type to support custom cycles.
+type ExtendedBudget = Omit<Budget, 'id'> & {
+  cycleStart?: string // ISO date string for custom cycle start
+  cycleLength?: number // in days (only for custom budgets)
+}
+
 const BudgetPage: React.FC = () => {
-  const { budgets, budgetSummaries, transactions, addBudget, deleteBudget, updateBudget } = useFinance()
-  const [newBudget, setNewBudget] = useState<Omit<Budget, 'id'>>({
+  const {
+    budgets,
+    budgetSummaries,
+    transactions,
+    addBudget,
+    deleteBudget,
+    updateBudget
+  } = useFinance()
+
+  // New budget state now includes custom fields.
+  const [newBudget, setNewBudget] = useState<ExtendedBudget>({
     category: '',
     name: '',
     amount: 0,
-    period: 'monthly',
+    period: 'monthly', // options: weekly, bi-weekly, monthly, yearly, custom
     color: '#6366f1'
+    // cycleStart and cycleLength will be defined if period === 'custom'
   })
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -137,17 +154,20 @@ const BudgetPage: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
+    // For cycleLength, parse as number.
     setNewBudget(prev => ({
       ...prev,
-      [name]: name === 'amount' ? parseFloat(value) || 0 : value
+      [name]: name === 'amount' || name === 'cycleLength' ? parseFloat(value) || 0 : value
     }))
   }
 
   const handleSelectChange = (name: string, value: string) => {
+    // When changing period, if user selects "custom", reset custom fields.
     setNewBudget(prev => ({
       ...prev,
       [name]: value,
-      color: name === 'category' ? getCategoryColor(value) : prev.color
+      color: name === 'category' ? getCategoryColor(value) : prev.color,
+      ...(name === 'period' && value === 'custom' ? { cycleStart: '', cycleLength: 0 } : {})
     }))
   }
 
@@ -183,6 +203,25 @@ const BudgetPage: React.FC = () => {
       })
       return false
     }
+    // If custom, require valid cycle start and length.
+    if (newBudget.period === 'custom') {
+      if (!newBudget.cycleStart) {
+        toast({
+          title: 'Error',
+          description: 'Please select a cycle start date for your custom budget',
+          variant: 'destructive'
+        })
+        return false
+      }
+      if (!newBudget.cycleLength || newBudget.cycleLength <= 0) {
+        toast({
+          title: 'Error',
+          description: 'Cycle length must be greater than zero',
+          variant: 'destructive'
+        })
+        return false
+      }
+    }
     return true
   }
 
@@ -197,7 +236,12 @@ const BudgetPage: React.FC = () => {
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
           period: newBudget.period,
-          color: newBudget.color
+          color: newBudget.color,
+          // Include custom fields if period is custom.
+          ...(newBudget.period === 'custom' && {
+            cycleStart: newBudget.cycleStart,
+            cycleLength: newBudget.cycleLength
+          })
         }
         updateBudget(updatedBudget)
         toast({
@@ -208,8 +252,7 @@ const BudgetPage: React.FC = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to update budget: ${error instanceof Error ? error.message : 'Unknown error'
-            }`,
+          description: `Failed to update budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: 'destructive'
         })
       }
@@ -222,7 +265,11 @@ const BudgetPage: React.FC = () => {
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
           period: newBudget.period,
-          color: newBudget.color
+          color: newBudget.color,
+          ...(newBudget.period === 'custom' && {
+            cycleStart: newBudget.cycleStart,
+            cycleLength: newBudget.cycleLength
+          })
         }
         addBudget(budgetData)
         toast({
@@ -233,8 +280,7 @@ const BudgetPage: React.FC = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to create budget: ${error instanceof Error ? error.message : 'Unknown error'
-            }`,
+          description: `Failed to create budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: 'destructive'
         })
       }
@@ -261,7 +307,10 @@ const BudgetPage: React.FC = () => {
       name: budget.name || budget.category,
       amount: budget.amount,
       period: budget.period,
-      color: budget.color || getCategoryColor(budget.category)
+      color: budget.color || getCategoryColor(budget.category),
+      // If the budget is custom, set custom fields.
+      cycleStart: (budget as any).cycleStart,
+      cycleLength: (budget as any).cycleLength
     })
     setCreateDialogOpen(true)
   }
@@ -282,8 +331,7 @@ const BudgetPage: React.FC = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: `Failed to delete budget: ${error instanceof Error ? error.message : 'Unknown error'
-            }`,
+          description: `Failed to delete budget: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: 'destructive'
         })
       } finally {
@@ -373,18 +421,31 @@ const BudgetPage: React.FC = () => {
     dialogCurrentPage * dialogItemsPerPage
   )
 
+  // Enhanced getBudgetPeriodText to support bi-weekly and custom cycles.
+  const getBudgetPeriodText = (period: string, cycleLength?: number) => {
+    switch (period) {
+      case 'weekly':
+        return 'Weekly Budget'
+      case 'bi-weekly':
+        return 'Bi-Weekly Budget'
+      case 'monthly':
+        return 'Monthly Budget'
+      case 'yearly':
+        return 'Annual Budget'
+      case 'custom':
+        return cycleLength ? `Custom Budget (${cycleLength} days)` : 'Custom Budget'
+      default:
+        return 'Monthly Budget'
+    }
+  }
+
   const getBudgetStatusColor = (percentage: number) => {
     if (percentage >= 100) return 'bg-red-500'
     if (percentage >= 75) return 'bg-yellow-500'
     return 'bg-green-500'
   }
 
-  const getBudgetPeriodText = (period: string) => {
-    if (period === 'weekly') return 'Weekly Budget'
-    if (period === 'yearly') return 'Annual Budget'
-    return 'Monthly Budget'
-  }
-
+  // Chart data for overall budget summaries.
   const doughnutData = {
     labels: budgetSummaries.map(b => b.budget.name || b.budget.category),
     datasets: [
@@ -514,8 +575,10 @@ const BudgetPage: React.FC = () => {
             <SelectContent>
               <SelectItem value="all">All Periods</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="bi-weekly">Bi-Weekly</SelectItem>
               <SelectItem value="monthly">Monthly</SelectItem>
               <SelectItem value="yearly">Yearly</SelectItem>
+              <SelectItem value="custom">Custom</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -531,39 +594,9 @@ const BudgetPage: React.FC = () => {
           <AlertDescription>No budgets match your search or filters.</AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading
-            ? Array.from({ length: itemsPerPage }).map((_, index) => (
-              <Card key={index} className="overflow-hidden">
-                <div className="h-2 bg-muted" />
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2 w-full">
-                      <Skeleton className="h-6 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <Skeleton className="h-8 w-1/3" />
-                    <Skeleton className="h-4 w-1/4" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-1/4" />
-                      <Skeleton className="h-4 w-1/6" />
-                    </div>
-                    <Skeleton className="h-2 w-full" />
-                  </div>
-                  <div className="flex justify-between pt-2">
-                    <Skeleton className="h-6 w-1/4" />
-                    <Skeleton className="h-6 w-1/3" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-            : currentItems.map(summary => (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {currentItems.map(summary => (
               <Card
                 key={summary.budget.id}
                 className="overflow-hidden cursor-pointer"
@@ -583,7 +616,10 @@ const BudgetPage: React.FC = () => {
                         {summary.budget.name || summary.budget.category}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground">
-                        {getBudgetPeriodText(summary.budget.period)}
+                        {getBudgetPeriodText(
+                          summary.budget.period,
+                          (summary.budget as any).cycleLength
+                        )}
                       </p>
                     </div>
                     <div className="flex gap-1">
@@ -648,7 +684,8 @@ const BudgetPage: React.FC = () => {
                 </CardContent>
               </Card>
             ))}
-        </div>
+          </div>
+        </motion.div>
       )}
       {filteredBudgetSummaries.length > itemsPerPage && (
         <Pagination className="mt-4">
@@ -773,11 +810,42 @@ const BudgetPage: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="bi-weekly">Bi-Weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="yearly">Yearly</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newBudget.period === 'custom' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cycleStart">Cycle Start Date</Label>
+                    <Input
+                      id="cycleStart"
+                      name="cycleStart"
+                      type="date"
+                      value={newBudget.cycleStart || ''}
+                      onChange={handleInputChange}
+                      placeholder="Select start date"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cycleLength">Cycle Length (days)</Label>
+                    <Input
+                      id="cycleLength"
+                      name="cycleLength"
+                      type="number"
+                      min="1"
+                      value={newBudget.cycleLength || ''}
+                      onChange={handleInputChange}
+                      placeholder="E.g., 30"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="color">Color</Label>
                 <div className="flex items-center gap-3">

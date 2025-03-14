@@ -12,14 +12,28 @@ import { Search, SlidersHorizontal, SortAsc, SortDesc, CreditCard, Coins, Wallet
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
-import { parseISO, format as formatFns } from 'date-fns'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts'
+import { parseISO, format as formatFns, differenceInDays } from 'date-fns'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts'
 import { motion } from 'framer-motion'
 // Assume Tabs components are available from your UI library.
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 /* --------------------------------------------------------------------------
-   Transaction Form Component
+   Transaction Form Component (unchanged)
    -------------------------------------------------------------------------- */
 function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction, onSuccess?: () => void }) {
   const { addTransaction, updateTransaction } = useFinance()
@@ -208,7 +222,7 @@ function DuplicateTransactionsAlert({ transactions }: { transactions: Transactio
 }
 
 /* --------------------------------------------------------------------------
-   Cash Flow Forecasting
+   Cash Flow Forecasting (unchanged)
    -------------------------------------------------------------------------- */
 function calculateCashFlowForecast(transactions: Transaction[], forecastPeriods = 3) {
   const filtered = transactions.filter(tx => tx.type === 'Income' || tx.type === 'Expense')
@@ -305,70 +319,50 @@ function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
 }
 
 /* --------------------------------------------------------------------------
-   Advanced Payment Method Insights Component
+   Payment Method Insights Component
    -------------------------------------------------------------------------- */
 function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }) {
-  // Local date range filter specific to Payment Insights.
-  const [insightsDateRange, setInsightsDateRange] = useState<DateRange | undefined>()
-  // Filter expense transactions by the local date range.
-  const expenseTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      if (tx.type !== 'Expense') return false
-      const txDate = new Date(tx.date)
-      if (insightsDateRange?.from && txDate < insightsDateRange.from) return false
-      if (insightsDateRange?.to && txDate > insightsDateRange.to) return false
-      return true
-    })
-  }, [transactions, insightsDateRange])
-
-  // Calculate totals for cash and card (both credit and debit).
-  const totals = useMemo(() => {
-    let cashTotal = 0, cardTotal = 0
-    expenseTransactions.forEach(tx => {
-      if (tx.payment_type === 'CASH') {
-        cashTotal += tx.amount
-      } else if (tx.payment_type === 'CREDIT_CARD' || tx.payment_type === 'DEBIT_CARD') {
-        cardTotal += tx.amount
+  const paymentStats = useMemo(() => {
+    const stats = new Map<string, { count: number; total: number }>()
+    transactions.forEach(tx => {
+      const method = tx.payment_type || 'TRANSFER'
+      if (!stats.has(method)) {
+        stats.set(method, { count: 0, total: 0 })
       }
+      const current = stats.get(method)!
+      current.count++
+      current.total += tx.amount
     })
-    return { cashTotal, cardTotal, total: cashTotal + cardTotal }
-  }, [expenseTransactions])
-
-  const pieData = useMemo(() => ([
-    { name: 'Cash', value: totals.cashTotal },
-    { name: 'Card', value: totals.cardTotal }
-  ]), [totals])
-
-  const COLORS = ['#FF595E', '#4ECDC4']
-
-  // Prepare detailed breakdown data for a table.
-  const breakdownData = useMemo(() => {
-    const rows = [
-      { method: 'Cash', total: totals.cashTotal, percentage: totals.total ? (totals.cashTotal / totals.total) * 100 : 0 },
-      { method: 'Card', total: totals.cardTotal, percentage: totals.total ? (totals.cardTotal / totals.total) * 100 : 0 }
-    ]
-    return rows
-  }, [totals])
+    return Array.from(stats.entries()).map(([method, data]) => ({
+      method: method.replace('_', ' '),
+      ...data
+    }))
+  }, [transactions])
 
   return (
     <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
       <CardHeader className="py-2 px-4 md:px-6">
-        <CardTitle className="text-xl">Cash vs. Card Expense Insights</CardTitle>
+        <CardTitle className="text-xl">Payment Method Analysis</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          Compare your expenses based on payment method
+          Overview of your payment method usage
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4">
-          <DateRangePicker dateRange={insightsDateRange} onDateRangeChange={setInsightsDateRange} />
-        </div>
-        <div className="flex flex-col md:flex-row items-center">
-          <div style={{ width: '100%', height: 300 }} className="md:w-1/2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="w-full h-72">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                <Pie
+                  data={paymentStats}
+                  dataKey="total"
+                  nameKey="method"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  {paymentStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={['#FF595E', '#4ECDC4', '#F9C74F', '#90BE6D'][index % 4]} />
                   ))}
                 </Pie>
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
@@ -376,32 +370,124 @@ function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 md:mt-0 md:ml-6 w-full">
-            <CardTitle className="text-lg font-semibold mb-2">Summary</CardTitle>
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="px-2 py-1 border-b">Payment Method</th>
-                  <th className="px-2 py-1 border-b">Total</th>
-                  <th className="px-2 py-1 border-b">Percentage</th>
-                </tr>
-              </thead>
-              <tbody>
-                {breakdownData.map((row, idx) => (
-                  <motion.tr
-                    key={idx}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: idx * 0.1 }}
-                    className="border-b"
-                  >
-                    <td className="px-2 py-1">{row.method}</td>
-                    <td className="px-2 py-1">{formatCurrency(row.total)}</td>
-                    <td className="px-2 py-1">{row.percentage.toFixed(1)}%</td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            {paymentStats.map(stat => (
+              <div key={stat.method} className="flex items-center justify-between p-2 border rounded">
+                <div className="flex items-center gap-2">
+                  <PaymentTypeIcon type={stat.method.replace(' ', '_')} />
+                  <span>{stat.method}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-medium">{formatCurrency(stat.total)}</div>
+                  <div className="text-sm text-muted-foreground">{stat.count} transactions</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* --------------------------------------------------------------------------
+   Spending Trends Visualization
+   -------------------------------------------------------------------------- */
+/**
+ * This component allows users to select a date range to view spending trends.
+ * It renders an interactive line chart (showing expense totals over time) and a pie chart (showing spending distribution by category).
+ */
+function SpendingTrends({ transactions }: { transactions: Transaction[] }) {
+  // Default date range: from the first day of the current month to today.
+  const [trendsDateRange, setTrendsDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    to: new Date()
+  })
+
+  // Filter only expense transactions within the selected date range.
+  const filteredExpenses = useMemo(() => {
+    return transactions.filter(tx => {
+      if (tx.type !== 'Expense') return false
+      const txDate = new Date(tx.date)
+      if (trendsDateRange?.from && txDate < trendsDateRange.from) return false
+      if (trendsDateRange?.to && txDate > trendsDateRange.to) return false
+      return true
+    })
+  }, [transactions, trendsDateRange])
+
+  // Group expenses by day (if range ≤ 31 days) or by month (if larger)
+  const expensesByTime = useMemo(() => {
+    if (!trendsDateRange || !trendsDateRange.from || !trendsDateRange.to) return []
+    const diffDays = differenceInDays(trendsDateRange.to, trendsDateRange.from)
+    const groupBy = diffDays <= 31 ? 'day' : 'month'
+    const groups: Record<string, number> = {}
+    filteredExpenses.forEach(tx => {
+      const d = new Date(tx.date)
+      let key = ''
+      if (groupBy === 'day') {
+        key = formatFns(d, 'MMM dd')
+      } else {
+        key = formatFns(d, 'MMM yyyy')
+      }
+      groups[key] = (groups[key] || 0) + tx.amount
+    })
+    // Convert groups to an array sorted chronologically.
+    return Object.entries(groups)
+      .map(([period, total]) => ({ period, total }))
+      .sort((a, b) => (a.period > b.period ? 1 : -1))
+  }, [filteredExpenses, trendsDateRange])
+
+  // Group expenses by category for the pie chart.
+  const expensesByCategory = useMemo(() => {
+    const groups: Record<string, number> = {}
+    filteredExpenses.forEach(tx => {
+      const cat = tx.category || 'Uncategorized'
+      groups[cat] = (groups[cat] || 0) + tx.amount
+    })
+    return Object.entries(groups).map(([category, total]) => ({ category, total }))
+  }, [filteredExpenses])
+
+  const PIE_COLORS = ['#FF595E', '#4ECDC4', '#F9C74F', '#90BE6D', '#577590']
+
+  return (
+    <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
+      <CardHeader className="py-2 px-4 md:px-6">
+        <CardTitle className="text-xl">Spending Trends</CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          Visualize your expense trends over time
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <DateRangePicker dateRange={trendsDateRange} onDateRangeChange={setTrendsDateRange} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Line Chart for Spending Over Time */}
+          <div className="w-full h-72">
+            <ResponsiveContainer>
+              <LineChart data={expensesByTime} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="period" />
+                <YAxis tickFormatter={value => formatCurrency(value)} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend />
+                <Line type="monotone" dataKey="total" stroke="#8884d8" dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Pie Chart for Spending by Category */}
+          <div className="w-full h-72">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={expensesByCategory} dataKey="total" nameKey="category" cx="50%" cy="50%" outerRadius={80} label>
+                  {expensesByCategory.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </CardContent>
@@ -608,12 +694,14 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
+      {/* Nav Tabs for a Compact UI */}
       <Tabs defaultValue="transactions">
         <TabsList>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="duplicates">Duplicates</TabsTrigger>
           <TabsTrigger value="forecast">Forecast</TabsTrigger>
           <TabsTrigger value="insights">Payment Insights</TabsTrigger>
+          <TabsTrigger value="trends">Spending Trends</TabsTrigger>
         </TabsList>
 
         {/* Transactions Tab */}
@@ -875,6 +963,13 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
         <TabsContent value="insights">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <PaymentMethodInsights transactions={transactions} />
+          </motion.div>
+        </TabsContent>
+
+        {/* New Spending Trends Tab */}
+        <TabsContent value="trends">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+            <SpendingTrends transactions={transactions} />
           </motion.div>
         </TabsContent>
       </Tabs>
