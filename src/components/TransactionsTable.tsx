@@ -13,31 +13,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
 import { parseISO, format as formatFns, differenceInDays } from 'date-fns'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Legend,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts'
 import { motion } from 'framer-motion'
-// Assume Tabs components are available from your UI library.
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
-/* --------------------------------------------------------------------------
-   Transaction Form Component (unchanged)
-   -------------------------------------------------------------------------- */
-function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction, onSuccess?: () => void }) {
+function TransactionForm({ transaction, onSuccess }) {
   const { addTransaction, updateTransaction } = useFinance()
-  const [formData, setFormData] = useState<Omit<Transaction, 'id'>>({
+  const [formData, setFormData] = useState({
     date: new Date().toISOString(),
     account: '',
     category: '',
@@ -65,12 +47,11 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
     }
   }, [transaction])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e) {
     e.preventDefault()
     try {
-      if (transaction) {
-        await updateTransaction({ ...transaction, ...formData })
-      } else {
+      if (transaction) await updateTransaction({ ...transaction, ...formData })
+      else {
         const newId = 'tx_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9)
         await addTransaction({ id: newId, ...formData })
       }
@@ -81,12 +62,12 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
     }
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+  function handleChange(e) {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: name === 'amount' ? Number(value) || 0 : value }))
   }
 
-  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleDateChange(e) {
     try {
       const selectedDate = new Date(e.target.value)
       setFormData(prev => ({ ...prev, date: selectedDate.toISOString() }))
@@ -96,14 +77,12 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
     }
   }
 
-  function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const value = e.target.value as "Income" | "Expense" | "Transfer"
-    setFormData(prev => ({ ...prev, type: value }))
+  function handleTypeChange(e) {
+    setFormData(prev => ({ ...prev, type: e.target.value }))
   }
 
-  function handlePaymentTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const value = e.target.value as "CASH" | "CREDIT_CARD" | "DEBIT_CARD" | "TRANSFER"
-    setFormData(prev => ({ ...prev, payment_type: value }))
+  function handlePaymentTypeChange(e) {
+    setFormData(prev => ({ ...prev, payment_type: e.target.value }))
   }
 
   return (
@@ -160,10 +139,7 @@ function TransactionForm({ transaction, onSuccess }: { transaction?: Transaction
   )
 }
 
-/* --------------------------------------------------------------------------
-   Payment Type Icon Component
-   -------------------------------------------------------------------------- */
-function PaymentTypeIcon({ type }: { type: string }) {
+function PaymentTypeIcon({ type }) {
   switch (type) {
     case 'CREDIT_CARD':
     case 'DEBIT_CARD':
@@ -177,24 +153,19 @@ function PaymentTypeIcon({ type }: { type: string }) {
   }
 }
 
-/* --------------------------------------------------------------------------
-   Duplicate Transaction Detection
-   -------------------------------------------------------------------------- */
-function detectDuplicateTransactions(transactions: Transaction[]): Transaction[][] {
-  const groups: Record<string, Transaction[]> = {}
+function detectDuplicateTransactions(transactions) {
+  const groups = {}
   transactions.forEach(tx => {
     const date = new Date(tx.date).toISOString().slice(0, 10)
     const key = `${date}-${tx.account.trim().toLowerCase()}-${tx.category.trim().toLowerCase()}-${tx.amount.toFixed(2)}`
-    if (!groups[key]) groups[key] = []
-    groups[key].push(tx)
+    groups[key] = groups[key] ? [...groups[key], tx] : [tx]
   })
   return Object.values(groups).filter(group => group.length > 1)
 }
 
-function DuplicateTransactionsAlert({ transactions }: { transactions: Transaction[] }) {
+function DuplicateTransactionsAlert({ transactions }) {
   const duplicateGroups = useMemo(() => detectDuplicateTransactions(transactions), [transactions])
-  if (duplicateGroups.length === 0) return null
-
+  if (!duplicateGroups.length) return null
   return (
     <Card className="bg-red-50 border border-red-200 p-4 my-4">
       <CardHeader>
@@ -221,70 +192,47 @@ function DuplicateTransactionsAlert({ transactions }: { transactions: Transactio
   )
 }
 
-/* --------------------------------------------------------------------------
-   Cash Flow Forecasting (unchanged)
-   -------------------------------------------------------------------------- */
-function calculateCashFlowForecast(transactions: Transaction[], forecastPeriods = 3) {
+function calculateCashFlowForecast(transactions, forecastPeriods = 3) {
   const filtered = transactions.filter(tx => tx.type === 'Income' || tx.type === 'Expense')
-  const groups = new Map<string, number>()
+  const groups = new Map()
   filtered.forEach(tx => {
     const date = new Date(tx.date)
     const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`
-    const current = groups.get(monthKey) || 0
-    groups.set(monthKey, current + (tx.type === 'Income' ? tx.amount : -tx.amount))
+    groups.set(monthKey, (groups.get(monthKey) || 0) + (tx.type === 'Income' ? tx.amount : -tx.amount))
   })
   const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
     const [yearA, monthA] = a.split('-').map(Number)
     const [yearB, monthB] = b.split('-').map(Number)
     return new Date(yearA, monthA - 1).getTime() - new Date(yearB, monthB - 1).getTime()
   })
-  const history = sortedKeys.map(key => ({
-    period: key,
-    netFlow: groups.get(key)
-  }))
+  const history = sortedKeys.map(key => ({ period: key, netFlow: groups.get(key) }))
   const lastPeriods = history.slice(-3)
   const avg = lastPeriods.reduce((sum, item) => sum + (item.netFlow || 0), 0) / (lastPeriods.length || 1)
   const forecast = []
-  const lastKey = sortedKeys[sortedKeys.length - 1]
-  let [year, month] = lastKey.split('-').map(Number)
+  let [year, month] = sortedKeys[sortedKeys.length - 1].split('-').map(Number)
   for (let i = 0; i < forecastPeriods; i++) {
     month += 1
     if (month > 12) {
       month = 1
       year += 1
     }
-    forecast.push({
-      period: `${year}-${month}`,
-      predictedNetFlow: avg
-    })
+    forecast.push({ period: `${year}-${month}`, predictedNetFlow: avg })
   }
   return { history, forecast }
 }
 
-function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
+function CashFlowForecast({ transactions }) {
   const { history, forecast } = useMemo(() => calculateCashFlowForecast(transactions, 3), [transactions])
   const chartData = useMemo(() => {
-    const data = history.map(item => ({
-      period: item.period,
-      netFlow: item.netFlow,
-      forecast: null
-    }))
-    forecast.forEach(item => {
-      data.push({
-        period: item.period,
-        netFlow: null,
-        forecast: item.predictedNetFlow
-      })
-    })
+    const data = history.map(item => ({ period: item.period, netFlow: item.netFlow, forecast: null }))
+    forecast.forEach(item => data.push({ period: item.period, netFlow: null, forecast: item.predictedNetFlow }))
     return data
   }, [history, forecast])
   return (
     <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
       <CardHeader className="py-2 px-4 md:px-6">
         <CardTitle className="text-xl">Cash Flow Forecast</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">
-          Projection based on past trends
-        </CardDescription>
+        <CardDescription className="text-sm text-muted-foreground">Projection based on past trends</CardDescription>
       </CardHeader>
       <CardContent>
         <div style={{ width: '100%', height: 300 }}>
@@ -295,21 +243,8 @@ function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
               <YAxis tickFormatter={value => formatCurrency(value)} />
               <Tooltip formatter={value => formatCurrency(value)} />
               <Legend />
-              <Line
-                type="monotone"
-                dataKey="netFlow"
-                stroke="#8884d8"
-                name="Historical Net Flow"
-                dot={{ r: 3 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                stroke="#82ca9d"
-                name="Forecasted Net Flow"
-                strokeDasharray="5 5"
-                dot={{ r: 3 }}
-              />
+              <Line type="monotone" dataKey="netFlow" stroke="#8884d8" name="Historical Net Flow" dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="forecast" stroke="#82ca9d" name="Forecasted Net Flow" strokeDasharray="5 5" dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -318,18 +253,13 @@ function CashFlowForecast({ transactions }: { transactions: Transaction[] }) {
   )
 }
 
-/* --------------------------------------------------------------------------
-   Payment Method Insights Component
-   -------------------------------------------------------------------------- */
-function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }) {
+function PaymentMethodInsights({ transactions }) {
   const paymentStats = useMemo(() => {
-    const stats = new Map<string, { count: number; total: number }>()
+    const stats = new Map()
     transactions.forEach(tx => {
       const method = tx.payment_type || 'TRANSFER'
-      if (!stats.has(method)) {
-        stats.set(method, { count: 0, total: 0 })
-      }
-      const current = stats.get(method)!
+      if (!stats.has(method)) stats.set(method, { count: 0, total: 0 })
+      const current = stats.get(method)
       current.count++
       current.total += tx.amount
     })
@@ -338,34 +268,23 @@ function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }
       ...data
     }))
   }, [transactions])
-
   return (
     <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
       <CardHeader className="py-2 px-4 md:px-6">
         <CardTitle className="text-xl">Payment Method Analysis</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">
-          Overview of your payment method usage
-        </CardDescription>
+        <CardDescription className="text-sm text-muted-foreground">Overview of your payment method usage</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="w-full h-72">
             <ResponsiveContainer>
               <PieChart>
-                <Pie
-                  data={paymentStats}
-                  dataKey="total"
-                  nameKey="method"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  label
-                >
+                <Pie data={paymentStats} dataKey="total" nameKey="method" cx="50%" cy="50%" outerRadius={80} label>
                   {paymentStats.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={['#FF595E', '#4ECDC4', '#F9C74F', '#90BE6D'][index % 4]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -390,21 +309,11 @@ function PaymentMethodInsights({ transactions }: { transactions: Transaction[] }
   )
 }
 
-/* --------------------------------------------------------------------------
-   Spending Trends Visualization
-   -------------------------------------------------------------------------- */
-/**
- * This component allows users to select a date range to view spending trends.
- * It renders an interactive line chart (showing expense totals over time) and a pie chart (showing spending distribution by category).
- */
-function SpendingTrends({ transactions }: { transactions: Transaction[] }) {
-  // Default date range: from the first day of the current month to today.
-  const [trendsDateRange, setTrendsDateRange] = useState<DateRange | undefined>({
+function SpendingTrends({ transactions }) {
+  const [trendsDateRange, setTrendsDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     to: new Date()
   })
-
-  // Filter only expense transactions within the selected date range.
   const filteredExpenses = useMemo(() => {
     return transactions.filter(tx => {
       if (tx.type !== 'Expense') return false
@@ -414,68 +323,52 @@ function SpendingTrends({ transactions }: { transactions: Transaction[] }) {
       return true
     })
   }, [transactions, trendsDateRange])
-
-  // Group expenses by day (if range ≤ 31 days) or by month (if larger)
   const expensesByTime = useMemo(() => {
     if (!trendsDateRange || !trendsDateRange.from || !trendsDateRange.to) return []
     const diffDays = differenceInDays(trendsDateRange.to, trendsDateRange.from)
     const groupBy = diffDays <= 31 ? 'day' : 'month'
-    const groups: Record<string, number> = {}
+    const groups = {}
     filteredExpenses.forEach(tx => {
       const d = new Date(tx.date)
-      let key = ''
-      if (groupBy === 'day') {
-        key = formatFns(d, 'MMM dd')
-      } else {
-        key = formatFns(d, 'MMM yyyy')
-      }
+      const key = groupBy === 'day' ? formatFns(d, 'MMM dd') : formatFns(d, 'MMM yyyy')
       groups[key] = (groups[key] || 0) + tx.amount
     })
-    // Convert groups to an array sorted chronologically.
     return Object.entries(groups)
       .map(([period, total]) => ({ period, total }))
       .sort((a, b) => (a.period > b.period ? 1 : -1))
   }, [filteredExpenses, trendsDateRange])
-
-  // Group expenses by category for the pie chart.
   const expensesByCategory = useMemo(() => {
-    const groups: Record<string, number> = {}
+    const groups = {}
     filteredExpenses.forEach(tx => {
       const cat = tx.category || 'Uncategorized'
       groups[cat] = (groups[cat] || 0) + tx.amount
     })
     return Object.entries(groups).map(([category, total]) => ({ category, total }))
   }, [filteredExpenses])
-
   const PIE_COLORS = ['#FF595E', '#4ECDC4', '#F9C74F', '#90BE6D', '#577590']
-
   return (
     <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
       <CardHeader className="py-2 px-4 md:px-6">
         <CardTitle className="text-xl">Spending Trends</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground">
-          Visualize your expense trends over time
-        </CardDescription>
+        <CardDescription className="text-sm text-muted-foreground">Visualize your expense trends over time</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="mb-4">
           <DateRangePicker dateRange={trendsDateRange} onDateRangeChange={setTrendsDateRange} />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Line Chart for Spending Over Time */}
           <div className="w-full h-72">
             <ResponsiveContainer>
               <LineChart data={expensesByTime} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="period" />
                 <YAxis tickFormatter={value => formatCurrency(value)} />
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
                 <Line type="monotone" dataKey="total" stroke="#8884d8" dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {/* Pie Chart for Spending by Category */}
           <div className="w-full h-72">
             <ResponsiveContainer>
               <PieChart>
@@ -484,7 +377,7 @@ function SpendingTrends({ transactions }: { transactions: Transaction[] }) {
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -495,42 +388,34 @@ function SpendingTrends({ transactions }: { transactions: Transaction[] }) {
   )
 }
 
-/* --------------------------------------------------------------------------
-   Main Transactions Table Component with Nav Tabs & Animations
-   -------------------------------------------------------------------------- */
-export default function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
+export default function TransactionsTable({ transactions }) {
   const { deleteTransaction } = useFinance()
   const [openCreateModal, setOpenCreateModal] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState<string | null>(null)
-  const [paymentFilter, setPaymentFilter] = useState<string | null>(null)
-  const [accountFilter, setAccountFilter] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [sortBy, setSortBy] = useState<keyof Transaction>('date')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [typeFilter, setTypeFilter] = useState(null)
+  const [paymentFilter, setPaymentFilter] = useState(null)
+  const [accountFilter, setAccountFilter] = useState(null)
+  const [dateRange, setDateRange] = useState()
+  const [sortBy, setSortBy] = useState('date')
+  const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  const [expandedRows, setExpandedRows] = useState(new Set())
+  const [selectedTx, setSelectedTx] = useState(null)
 
   const allAccounts = useMemo(() => {
-    const set = new Set<string>()
-    transactions.forEach(tx => set.add(tx.account))
-    return Array.from(set).sort()
+    const setAcc = new Set()
+    transactions.forEach(tx => setAcc.add(tx.account))
+    return Array.from(setAcc).sort()
   }, [transactions])
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const query = searchTerm.toLowerCase()
-      const matchesSearch = [
-        tx.account.toLowerCase(),
-        tx.category.toLowerCase(),
-        (tx.notes || '').toLowerCase(),
-        (tx.description || '').toLowerCase()
-      ].some(str => str.includes(query))
+      const matchesSearch = [tx.account.toLowerCase(), tx.category.toLowerCase(), (tx.notes || '').toLowerCase(), (tx.description || '').toLowerCase()].some(str => str.includes(query))
       const matchesType = typeFilter ? tx.type === typeFilter : true
       const matchesPayment = paymentFilter ? tx.payment_type === paymentFilter : true
       const matchesAccount = accountFilter ? tx.account === accountFilter : true
@@ -545,8 +430,8 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
   const sortedTransactions = useMemo(() => {
     const sorted = [...filteredTransactions]
     sorted.sort((a, b) => {
-      let valA: any = a[sortBy]
-      let valB: any = b[sortBy]
+      let valA = a[sortBy]
+      let valB = b[sortBy]
       if (sortBy === 'date') {
         valA = new Date(a.date).getTime()
         valB = new Date(b.date).getTime()
@@ -569,22 +454,19 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
   }, [filteredTransactions])
 
   const accountsSummary = useMemo(() => {
-    const map = new Map<string, { account: string; totalIncome: number; totalExpense: number; count: number }>()
+    const map = new Map()
     filteredTransactions.forEach(tx => {
-      if (!map.has(tx.account)) {
-        map.set(tx.account, { account: tx.account, totalIncome: 0, totalExpense: 0, count: 0 })
-      }
-      const data = map.get(tx.account)!
-      data.count += 1
-      if (tx.type === 'Income') data.totalIncome += tx.amount
-      else data.totalExpense += tx.amount
+      if (!map.has(tx.account)) map.set(tx.account, { account: tx.account, totalIncome: 0, totalExpense: 0, count: 0 })
+      const data = map.get(tx.account)
+      data.count++
+      tx.type === 'Income' ? data.totalIncome += tx.amount : data.totalExpense += tx.amount
     })
     const result = Array.from(map.values()).map(a => ({ ...a, net: a.totalIncome - a.totalExpense }))
     result.sort((a, b) => b.net - a.net)
     return result
   }, [filteredTransactions])
 
-  function handleSort(column: keyof Transaction) {
+  function handleSort(column) {
     if (sortBy === column) setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'))
     else {
       setSortBy(column)
@@ -592,7 +474,7 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
     }
   }
 
-  function renderSortIcon(column: keyof Transaction) {
+  function renderSortIcon(column) {
     if (sortBy !== column) return null
     return sortOrder === 'asc' ? <SortAsc className="ml-1 h-4 w-4" /> : <SortDesc className="ml-1 h-4 w-4" />
   }
@@ -637,7 +519,7 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
     }
   }
 
-  function toggleRowExpansion(id: string) {
+  function toggleRowExpansion(id) {
     setExpandedRows(prev => {
       const newSet = new Set(prev)
       newSet.has(id) ? newSet.delete(id) : newSet.add(id)
@@ -645,12 +527,12 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
     })
   }
 
-  function handleEdit(tx: Transaction) {
+  function handleEdit(tx) {
     setSelectedTx(tx)
     setEditModalOpen(true)
   }
 
-  function handleDelete(tx: Transaction) {
+  function handleDelete(tx) {
     setSelectedTx(tx)
     setDeleteModalOpen(true)
   }
@@ -667,13 +549,13 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
     }
   }
 
-  function openInvoice(tx: Transaction) {
+  function openInvoice(tx) {
     setSelectedTx(tx)
     setInvoiceModalOpen(true)
   }
 
   const expenseByCategory = useMemo(() => {
-    const map = new Map<string, number>()
+    const map = new Map()
     filteredTransactions.forEach(tx => {
       if (tx.type === 'Expense') {
         const cat = tx.category || 'Uncategorized'
@@ -694,7 +576,6 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
-      {/* Nav Tabs for a Compact UI */}
       <Tabs defaultValue="transactions">
         <TabsList>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -703,16 +584,12 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
           <TabsTrigger value="insights">Payment Insights</TabsTrigger>
           <TabsTrigger value="trends">Spending Trends</TabsTrigger>
         </TabsList>
-
-        {/* Transactions Tab */}
         <TabsContent value="transactions">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <Card className="border bg-card/60 backdrop-blur-sm shadow-sm mb-4">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Filter Transactions</CardTitle>
-                <CardDescription className="text-sm text-muted-foreground">
-                  Narrow down your transactions with filters
-                </CardDescription>
+                <CardDescription className="text-sm text-muted-foreground">Narrow down your transactions with filters</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-center gap-4 flex-wrap">
@@ -722,20 +599,11 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                       type="text"
                       placeholder="Search transactions..."
                       value={searchTerm}
-                      onChange={e => {
-                        setSearchTerm(e.target.value)
-                        setCurrentPage(1)
-                      }}
+                      onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1) }}
                       className="pl-8 h-9 text-sm"
                     />
                   </div>
-                  <DateRangePicker
-                    dateRange={dateRange}
-                    onDateRangeChange={range => {
-                      setDateRange(range)
-                      setCurrentPage(1)
-                    }}
-                  />
+                  <DateRangePicker dateRange={dateRange} onDateRangeChange={range => { setDateRange(range); setCurrentPage(1) }} />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
@@ -802,10 +670,7 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                   <select
                     className="h-9 px-3 py-0 border rounded text-sm bg-background"
                     value={pageSize}
-                    onChange={e => {
-                      setPageSize(Number(e.target.value))
-                      setCurrentPage(1)
-                    }}
+                    onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
                   >
                     <option value="10">10 per page</option>
                     <option value="25">25 per page</option>
@@ -826,7 +691,6 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                 </div>
               </CardContent>
             </Card>
-
             <Card className="bg-card/60 backdrop-blur-sm shadow-sm border">
               <CardHeader className="py-2 px-4 md:px-6">
                 <CardTitle className="text-xl">Transactions</CardTitle>
@@ -863,12 +727,8 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                                 <TableCell className="font-medium group-hover:text-primary px-2 md:px-4 text-sm md:text-base">
                                   {formatDate(tx.date)}
                                 </TableCell>
-                                <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                                  {tx.account}
-                                </TableCell>
-                                <TableCell className="px-2 md:px-4 text-sm md:text-base">
-                                  {tx.category}
-                                </TableCell>
+                                <TableCell className="px-2 md:px-4 text-sm md:text-base">{tx.account}</TableCell>
+                                <TableCell className="px-2 md:px-4 text-sm md:text-base">{tx.category}</TableCell>
                                 <TableCell className={`text-right font-medium ${tx.type === 'Income' ? 'text-green-600' : 'text-red-600'} px-2 md:px-4 text-sm md:text-base`}>
                                   {tx.type === 'Income' ? '+' : '-'} {formatCurrency(tx.amount)}
                                 </TableCell>
@@ -920,9 +780,7 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={7} className="h-24 text-center text-sm">
-                            No transactions found.
-                          </TableCell>
+                          <TableCell colSpan={7} className="h-24 text-center text-sm">No transactions found.</TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -944,36 +802,27 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
             </Card>
           </motion.div>
         </TabsContent>
-
-        {/* Duplicates Tab */}
         <TabsContent value="duplicates">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <DuplicateTransactionsAlert transactions={transactions} />
           </motion.div>
         </TabsContent>
-
-        {/* Forecast Tab */}
         <TabsContent value="forecast">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <CashFlowForecast transactions={transactions} />
           </motion.div>
         </TabsContent>
-
-        {/* Payment Insights Tab */}
         <TabsContent value="insights">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <PaymentMethodInsights transactions={transactions} />
           </motion.div>
         </TabsContent>
-
-        {/* New Spending Trends Tab */}
         <TabsContent value="trends">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
             <SpendingTrends transactions={transactions} />
           </motion.div>
         </TabsContent>
       </Tabs>
-
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -984,7 +833,6 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
           )}
         </DialogContent>
       </Dialog>
-
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -999,7 +847,6 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
@@ -1049,7 +896,6 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
           )}
         </DialogContent>
       </Dialog>
-
       {expenseByCategory.length > 0 && (
         <Card className="bg-card/60 backdrop-blur-sm shadow-sm border mt-6">
           <CardHeader className="py-2 px-4 md:px-6">
@@ -1065,7 +911,7 @@ export default function TransactionsTable({ transactions }: { transactions: Tran
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="category" />
                   <YAxis />
-                  <Tooltip formatter={(value: number) => [formatCurrency(value), 'Expense']} />
+                  <Tooltip formatter={(value) => [formatCurrency(value), 'Expense']} />
                   <Bar dataKey="amount" fill="#FF595E" name="Expense" />
                 </BarChart>
               </ResponsiveContainer>
