@@ -39,8 +39,6 @@ type ExtendedBudget = Omit<Budget, 'id'> & {
   cycleLength?: number
 }
 
-type PeriodType = 'weekly' | 'monthly' | 'yearly' | 'custom';
-
 const BudgetPage: React.FC = () => {
   const { budgets, budgetSummaries, transactions, addBudget, deleteBudget, updateBudget } = useFinance()
   const [newBudget, setNewBudget] = useState<ExtendedBudget>({
@@ -98,7 +96,7 @@ const BudgetPage: React.FC = () => {
       ...p,
       [name]: value,
       color: name === 'category' ? getCategoryColor(value) : p.color,
-      ...((name === 'period' && value === 'custom') ? { cycleStart: '', cycleLength: 0 } : {})
+      ...(name === 'period' && value === 'custom' ? { cycleStart: '', cycleLength: 0 } : {})
     }))
   }
 
@@ -119,7 +117,7 @@ const BudgetPage: React.FC = () => {
       toast({ title: 'Error', description: 'Budget amount must be greater than zero', variant: 'destructive' })
       return false
     }
-    if ((newBudget.period as string) === 'custom') {
+    if (newBudget.period === 'custom') {
       if (!newBudget.cycleStart) {
         toast({
           title: 'Error',
@@ -146,9 +144,9 @@ const BudgetPage: React.FC = () => {
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
-          period: newBudget.period as Budget['period'],
+          period: newBudget.period,
           color: newBudget.color,
-          ...((newBudget.period as string) === 'custom' && {
+          ...(newBudget.period === 'custom' && {
             cycleStart: newBudget.cycleStart,
             cycleLength: newBudget.cycleLength
           })
@@ -175,9 +173,9 @@ const BudgetPage: React.FC = () => {
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
-          period: newBudget.period as Budget['period'],
+          period: newBudget.period,
           color: newBudget.color,
-          ...((newBudget.period as string) === 'custom' && {
+          ...(newBudget.period === 'custom' && {
             cycleStart: newBudget.cycleStart,
             cycleLength: newBudget.cycleLength
           })
@@ -660,7 +658,7 @@ const BudgetPage: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {(newBudget.period as string) === 'custom' && (
+              {newBudget.period === 'custom' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="cycleStart">Cycle Start Date</Label>

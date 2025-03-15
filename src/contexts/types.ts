@@ -1,5 +1,5 @@
 
-import { Budget, BudgetSummary, DashboardStats, Transaction, Subscription } from '@/types/finance';
+import { Budget, BudgetSummary, DashboardStats, Transaction } from '@/types/finance';
 import { User as FirebaseUser } from 'firebase/auth';
 
 export interface FinanceContextType {
@@ -32,9 +32,4 @@ export interface FinanceContextType {
     renewalDate: Date | null;
   } | null;
   hasFeatureAccess: (featureName: string) => boolean;
-  // New subscription management
-  subscriptions: Subscription[];
-  addSubscription: (subscription: Subscription) => Promise<void>;
-  updateSubscription: (subscription: Subscription) => Promise<void>;
-  deleteSubscription: (id: string) => Promise<void>;
 }

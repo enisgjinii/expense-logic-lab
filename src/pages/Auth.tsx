@@ -17,18 +17,14 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  ChevronLeft,
-  Shield
+  ChevronLeft
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/firebase';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { useLanguage } from '@/contexts/LanguageContext';
 
 const Auth: React.FC = () => {
-  const { user, signIn, signUp, isAuthLoading, twoFactorEnabled, verifyTwoFactorCode } = useFinance();
-  const { t } = useLanguage();
+  const { user, signIn, signUp, isAuthLoading } = useFinance();
   const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -40,11 +36,9 @@ const Auth: React.FC = () => {
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showTwoFactorVerification, setShowTwoFactorVerification] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   // Redirect to home if already logged in and auth is not loading
-  if (user && !isAuthLoading && !showTwoFactorVerification) {
+  if (user && !isAuthLoading) {
     return <Navigate to="/" />;
   }
 
@@ -54,60 +48,21 @@ const Auth: React.FC = () => {
     setError(null);
 
     if (!loginEmail || !loginPassword) {
-      setError(t('auth.fillAllFields'));
+      setError("Please fill in all fields");
       return;
     }
 
     setIsLoading(true);
     try {
       await signIn(loginEmail, loginPassword);
-      
-      // Check if 2FA is enabled for this user
-      if (twoFactorEnabled) {
-        setShowTwoFactorVerification(true);
-        toast({
-          title: t('auth.twoFactorRequired'),
-          description: t('auth.enterGACode'),
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: t('auth.success'),
-          description: t('auth.welcomeBack'),
-          variant: "default"
-        });
-        navigate('/');
-      }
+      toast({
+        title: "Success",
+        description: "Welcome back!",
+        variant: "default"
+      });
+      navigate('/');
     } catch (error: any) {
-      setError(error.message || t('auth.failedToSignIn'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Google Authenticator verification handler
-  const handleVerifyTwoFactor = async () => {
-    if (twoFactorCode.length !== 6) {
-      setError(t('profile.enterValidCode'));
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const isValid = await verifyTwoFactorCode(twoFactorCode);
-      if (isValid) {
-        toast({
-          title: t('auth.success'),
-          description: t('auth.welcomeBack'),
-          variant: "default"
-        });
-        setShowTwoFactorVerification(false);
-        navigate('/');
-      } else {
-        setError(t('auth.invalidGACode'));
-      }
-    } catch (error: any) {
-      setError(error.message || t('auth.failedToVerify'));
+      setError(error.message || "Failed to sign in");
     } finally {
       setIsLoading(false);
     }
@@ -181,81 +136,7 @@ const Auth: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background">
         <CreditCard className="h-16 w-16 text-primary mb-4 animate-pulse" />
         <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-muted-foreground">{t('auth.loadingAccount')}</p>
-      </div>
-    );
-  }
-
-  // Show Google Authenticator verification if needed
-  if (showTwoFactorVerification) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-secondary/10 p-4">
-        <div className="w-full max-w-md">
-          <Button 
-            variant="ghost" 
-            className="mb-6" 
-            onClick={() => setShowTwoFactorVerification(false)}
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            {t('common.back')}
-          </Button>
-          
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-primary/10 p-4 rounded-full mb-4">
-              <Shield className="h-12 w-12 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
-              {t('auth.twoFactorAuth')}
-            </h1>
-            <p className="text-muted-foreground mt-2 text-center">
-              {t('auth.enterGACodeToLogin')}
-            </p>
-          </div>
-
-          {error && (
-            <Alert variant="destructive" className="mb-6 animate-shake">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <Card className="border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-2xl">{t('auth.googleAuthenticator')}</CardTitle>
-              <CardDescription>
-                {t('auth.enterGACode')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="flex justify-center py-4">
-                <InputOTP maxLength={6} value={twoFactorCode} onChange={setTwoFactorCode}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
-            </CardContent>
-            <CardFooter className="flex flex-col">
-              <Button
-                onClick={handleVerifyTwoFactor}
-                className="w-full h-12 font-medium transition-all hover:scale-[1.01]"
-                disabled={isLoading || twoFactorCode.length !== 6}
-              >
-                {isLoading ? (
-                  <div className="h-5 w-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2"></div>
-                ) : (
-                  <Shield className="mr-2 h-5 w-5" />
-                )}
-                {t('auth.verify')}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
+        <p className="mt-4 text-muted-foreground">Loading your account...</p>
       </div>
     );
   }
