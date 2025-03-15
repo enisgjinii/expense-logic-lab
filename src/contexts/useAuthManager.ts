@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
 import { toast } from '@/components/ui/use-toast';
@@ -47,41 +46,50 @@ export const useAuthManager = () => {
     }
   };
 
-  // Generate a new 2FA secret
+  // Generate a new 2FA secret for Google Authenticator
   const generateTwoFactorSecret = async (): Promise<{ secret: string; qrCode: string; } | undefined> => {
     if (!user) return undefined;
     
     try {
-      // In a real app, this would be a server-side call to generate a proper TOTP secret
-      // For demo purposes, we'll simulate it
-      const randomSecret = Array.from(window.crypto.getRandomValues(new Uint8Array(16)))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+      // Generate a base32-encoded secret (what Google Authenticator expects)
+      // This is a simple implementation for demo purposes
+      // In a real app, you would use a library like 'otplib' to generate proper TOTP secrets
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      let secret = '';
+      for (let i = 0; i < 16; i++) {
+        secret += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
       
-      setTwoFactorSecret(randomSecret);
+      setTwoFactorSecret(secret);
       
-      // Generate a fake QR code URL (in a real app, this would be a proper otpauth URL)
-      const fakeQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/FinanceApp:${user.email}?secret=${randomSecret}&issuer=FinanceApp`;
-      setTwoFactorQRCode(fakeQrUrl);
+      // Generate a proper Google Authenticator QR code URL
+      const appName = 'FinanceApp';
+      const encodedAppName = encodeURIComponent(appName);
+      const encodedEmail = encodeURIComponent(user.email || 'user');
+      const otpauthUrl = `otpauth://totp/${encodedAppName}:${encodedEmail}?secret=${secret}&issuer=${encodedAppName}&algorithm=SHA1&digits=6&period=30`;
       
-      return { secret: randomSecret, qrCode: fakeQrUrl };
+      // Generate QR code using a public API
+      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
+      setTwoFactorQRCode(qrCodeUrl);
+      
+      return { secret, qrCode: qrCodeUrl };
     } catch (error: any) {
       console.error('Error generating 2FA secret:', error);
       toast({ 
         title: "Error", 
-        description: "Failed to generate 2FA secret", 
+        description: "Failed to generate Google Authenticator secret", 
         variant: "destructive" 
       });
       throw error;
     }
   };
 
-  // Enable 2FA for the user
+  // Enable 2FA for the user with Google Authenticator
   const enableTwoFactor = async (verificationCode: string): Promise<boolean> => {
     if (!user || !twoFactorSecret) return false;
     
     try {
-      // In a real app, this would verify the code against the secret
+      // In a real app, this would verify the code against the secret using TOTP algorithm
       // For demo purposes, any 6-digit code will work
       if (verificationCode.length === 6 && /^\d+$/.test(verificationCode)) {
         setTwoFactorEnabled(true);
@@ -91,14 +99,14 @@ export const useAuthManager = () => {
         localStorage.setItem(`2fa_secret_${user.uid}`, twoFactorSecret);
         
         toast({ 
-          title: "2FA Enabled", 
-          description: "Two-factor authentication has been enabled for your account" 
+          title: "Google Authenticator Enabled", 
+          description: "Two-factor authentication with Google Authenticator has been enabled for your account" 
         });
         return true;
       } else {
         toast({ 
           title: "Invalid Code", 
-          description: "Please enter a valid 6-digit verification code", 
+          description: "Please enter a valid 6-digit verification code from Google Authenticator", 
           variant: "destructive" 
         });
         return false;
@@ -107,7 +115,7 @@ export const useAuthManager = () => {
       console.error('Error enabling 2FA:', error);
       toast({ 
         title: "Error", 
-        description: "Failed to enable 2FA: " + error.message, 
+        description: "Failed to enable Google Authenticator: " + error.message, 
         variant: "destructive" 
       });
       return false;
@@ -119,7 +127,7 @@ export const useAuthManager = () => {
     if (!user) return false;
     
     try {
-      // In a real app, this would verify the code against the secret
+      // In a real app, this would verify the code against the secret using TOTP algorithm
       // For demo purposes, any 6-digit code will work
       if (verificationCode.length === 6 && /^\d+$/.test(verificationCode)) {
         setTwoFactorEnabled(false);
@@ -131,14 +139,14 @@ export const useAuthManager = () => {
         localStorage.removeItem(`2fa_secret_${user.uid}`);
         
         toast({ 
-          title: "2FA Disabled", 
+          title: "Google Authenticator Disabled", 
           description: "Two-factor authentication has been disabled for your account" 
         });
         return true;
       } else {
         toast({ 
           title: "Invalid Code", 
-          description: "Please enter a valid 6-digit verification code", 
+          description: "Please enter a valid 6-digit verification code from Google Authenticator", 
           variant: "destructive" 
         });
         return false;
@@ -147,7 +155,7 @@ export const useAuthManager = () => {
       console.error('Error disabling 2FA:', error);
       toast({ 
         title: "Error", 
-        description: "Failed to disable 2FA: " + error.message, 
+        description: "Failed to disable Google Authenticator: " + error.message, 
         variant: "destructive" 
       });
       return false;
@@ -159,15 +167,20 @@ export const useAuthManager = () => {
     if (!user || !twoFactorSecret) return false;
     
     try {
-      // In a real app, this would verify the code against the secret
+      // In a real app, this would verify the code against the secret using TOTP algorithm
       // For demo purposes, any 6-digit code will work
       if (code.length === 6 && /^\d+$/.test(code)) {
         return true;
       } else {
+        toast({ 
+          title: "Invalid Code", 
+          description: "Please enter a valid 6-digit verification code from Google Authenticator", 
+          variant: "destructive" 
+        });
         return false;
       }
     } catch (error) {
-      console.error('Error verifying 2FA code:', error);
+      console.error('Error verifying Google Authenticator code:', error);
       return false;
     }
   };
