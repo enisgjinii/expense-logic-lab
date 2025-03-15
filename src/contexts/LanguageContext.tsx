@@ -16,41 +16,24 @@ interface LanguageContextType {
 
 const defaultLanguage: Language = 'en';
 
-// Helper to detect browser language
-const detectBrowserLanguage = (): Language => {
-  const browserLang = navigator.language.split('-')[0];
-  return (browserLang as Language) in translations ? (browserLang as Language) : defaultLanguage;
-};
-
-const RTL_LANGUAGES: Language[] = []; // No RTL languages in current setup, but added for future expansion
-
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider = ({ children }: { children: ReactNode }) => {
-  const [language, setLanguageState] = useLocalStorage<Language>('app-language', detectBrowserLanguage());
-  const [isRTL, setIsRTL] = useState<boolean>(RTL_LANGUAGES.includes(language));
+  // Always use English
+  const [language, setLanguageState] = useLocalStorage<Language>('app-language', defaultLanguage);
+  const [isRTL, setIsRTL] = useState<boolean>(false);
 
   useEffect(() => {
     document.documentElement.lang = language;
-    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-    
-    // Set class for RTL styling if needed
-    if (isRTL) {
-      document.documentElement.classList.add('rtl');
-    } else {
-      document.documentElement.classList.remove('rtl');
-    }
-  }, [language, isRTL]);
-
-  useEffect(() => {
-    setIsRTL(RTL_LANGUAGES.includes(language));
+    document.documentElement.dir = 'ltr';
+    document.documentElement.classList.remove('rtl');
   }, [language]);
 
   const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
+    setLanguageState('en'); // Force English
   };
 
-  // Advanced translation function with variable substitution and nested key support
+  // Translation function with variable substitution and nested key support
   const t = (key: string, variables?: Record<string, string | number>): string => {
     const keys = key.split('.');
     let value: any = translations[language];
@@ -60,31 +43,8 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       if (value && Object.prototype.hasOwnProperty.call(value, k)) {
         value = value[k];
       } else {
-        // If key not found in current language, try English as fallback
-        if (language !== 'en') {
-          console.warn(`Translation key not found in ${language}: ${key}, trying English fallback`);
-          let fallbackValue = translations.en;
-          let found = true;
-          
-          for (const fallbackKey of keys) {
-            if (fallbackValue && Object.prototype.hasOwnProperty.call(fallbackValue, fallbackKey)) {
-              fallbackValue = fallbackValue[fallbackKey];
-            } else {
-              found = false;
-              break;
-            }
-          }
-          
-          if (found) {
-            value = fallbackValue;
-          } else {
-            console.warn(`Translation key not found in fallback language: ${key}`);
-            return key; // Return the key as last resort
-          }
-        } else {
-          console.warn(`Translation key not found: ${key}`);
-          return key;
-        }
+        console.warn(`Translation key not found: ${key}`);
+        return key;
       }
     }
 
@@ -155,7 +115,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         language, 
         setLanguage, 
         t, 
-        availableLanguages: languages,
+        availableLanguages: { en: languages.en },
         isRTL,
         formatDate,
         formatNumber,
@@ -174,4 +134,3 @@ export const useLanguage = () => {
   }
   return context;
 };
-

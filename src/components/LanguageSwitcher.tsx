@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Language } from '@/locales';
 
 interface LanguageSwitcherProps {
-  variant?: 'default' | 'outline' | 'ghost' | 'icon';
+  variant?: 'default' | 'outline' | 'ghost';
 }
 
 const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 'outline' }) => {
@@ -23,11 +23,9 @@ const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({ variant = 'outline'
       <DropdownMenuTrigger asChild>
         <Button variant={variant} size="sm" className="h-8 gap-1">
           <Languages className="h-4 w-4" />
-          {variant !== 'icon' && (
-            <span className="hidden md:inline-flex">
-              {availableLanguages[language].nativeName}
-            </span>
-          )}
+          <span className="hidden md:inline-flex">
+            {availableLanguages[language].nativeName}
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

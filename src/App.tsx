@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Categories from "./pages/Categories";
+import Subscriptions from "./pages/Subscriptions";
 import { FinanceProvider } from "./contexts/FinanceContext";
 import { useFinance } from "./contexts/FinanceContext";
 
@@ -89,6 +90,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Layout><Categories /></Layout>
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/subscriptions" 
+        element={
+          <ProtectedRoute>
+            <Layout><Subscriptions /></Layout>
           </ProtectedRoute>
         } 
       />
