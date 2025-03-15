@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -31,11 +30,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
-} from "@/components/ui/select"
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface SidebarItemProps {
   icon: React.ReactNode;
@@ -498,6 +497,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            
+            {!isCollapsed && (
+              <div className="border-t mt-4 mb-4 pt-4 px-2">
+                <p className="mb-2 text-xs sm:text-sm font-medium">Language</p>
+                <Select defaultValue="en">
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="sq">Albanian</SelectItem>
+                    <SelectItem value="de">German</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             
             {/* <div className="mt-4 flex justify-center">
