@@ -8,9 +8,14 @@ interface SpendingAlertProps {
 }
 
 const SpendingAlert: React.FC<SpendingAlertProps> = ({ category, growth }) => {
-  const { t } = useLanguage();
+  const { t, formatNumber } = useLanguage();
   
   if (!category || !growth) return null;
+  
+  const formattedGrowth = formatNumber(growth, { 
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1
+  });
   
   return (
     <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6 animate-pulse">
@@ -23,7 +28,10 @@ const SpendingAlert: React.FC<SpendingAlertProps> = ({ category, growth }) => {
         <div className="ml-3">
           <h3 className="text-sm font-medium text-amber-800">{t('dashboard.spendingAlert')}</h3>
           <div className="mt-1 text-sm text-amber-700">
-            {t('dashboard.spendingAlertDescription', { category: category, growth: growth.toFixed(1) })}
+            {t('dashboard.spendingAlertDescription', { 
+              category, 
+              growth: formattedGrowth 
+            })}
           </div>
         </div>
       </div>

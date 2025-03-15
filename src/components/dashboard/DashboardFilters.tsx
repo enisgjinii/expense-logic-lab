@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 interface DashboardFiltersProps {
   timeRange: string;
@@ -44,11 +45,17 @@ const DashboardFilters: React.FC<DashboardFiltersProps> = ({
         onClick={handleRefresh} 
         disabled={isRefreshing}
         className="p-2 rounded-full hover:bg-muted transition-all"
+        aria-label={t('dashboard.refresh')}
+        title={t('dashboard.refresh')}
       >
         <svg className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
+      
+      <div className="ml-2">
+        <LanguageSwitcher variant="icon" />
+      </div>
     </div>
   );
 };

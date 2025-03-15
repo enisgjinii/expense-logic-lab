@@ -5,7 +5,7 @@ export default {
     budget: "Budget",
     import: "Import",
     reports: "Reports",
-		categories: "Categories",
+    categories: "Categories",
     settings: "Settings",
     profile: "Profile",
     logout: "Logout",
@@ -229,9 +229,7 @@ export default {
     error: "Error",
     warning: "Warning",
     recommended: "Recommended",
-    enabled: "Enabled",
-    warning: "Warning",
-    cancel: "Cancel",
+    enabled: "Enabled"
   },
   auth: {
     login: "Login",

@@ -61,8 +61,7 @@ export default {
     close: "Mbyll",
     enabled: "Aktivizuar",
     warning: "Paralajmërim",
-    cancel: "Anulo",
-    recommended: "Rekomanduar",
+    recommended: "Rekomanduar"
   },
   transaction: {
     addTransaction: "Shto Transaksion",
