@@ -1,4 +1,3 @@
-
 // Transaction type definitions
 export interface Transaction {
   id: string;
@@ -27,10 +26,12 @@ export interface Budget {
   category: string;
   name?: string; // Adding name property for budget
   amount: number;
-  period: 'weekly' | 'monthly' | 'yearly';
+  period: 'weekly' | 'bi-weekly' | 'monthly' | 'yearly' | 'custom';
   createdAt?: any;
   updatedAt?: any;
   color?: string;
+  cycleStart?: string; // Adding these properties to match the code usage
+  cycleLength?: number;
 }
 export interface BudgetSummary {
   budget: Budget;

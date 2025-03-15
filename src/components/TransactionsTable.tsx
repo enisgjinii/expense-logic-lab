@@ -40,3 +40,11 @@ function safeSetState<T>(value: unknown, setter: React.Dispatch<React.SetStateAc
     setter(defaultValue);
   }
 }
+
+// Add a default export to fix the import issue
+export default {
+  formatDateRange,
+  handleDateRangeChange,
+  safeGetKey,
+  safeSetState
+};

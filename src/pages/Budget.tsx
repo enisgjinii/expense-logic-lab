@@ -98,7 +98,7 @@ const BudgetPage: React.FC = () => {
       ...p,
       [name]: value,
       color: name === 'category' ? getCategoryColor(value) : p.color,
-      ...(name === 'period' && value === 'custom' ? { cycleStart: '', cycleLength: 0 } : {})
+      ...((name === 'period' && value === 'custom') ? { cycleStart: '', cycleLength: 0 } : {})
     }))
   }
 
@@ -119,7 +119,7 @@ const BudgetPage: React.FC = () => {
       toast({ title: 'Error', description: 'Budget amount must be greater than zero', variant: 'destructive' })
       return false
     }
-    if (newBudget.period === 'custom') {
+    if ((newBudget.period as string) === 'custom') {
       if (!newBudget.cycleStart) {
         toast({
           title: 'Error',
@@ -146,9 +146,9 @@ const BudgetPage: React.FC = () => {
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
-          period: newBudget.period,
+          period: newBudget.period as Budget['period'],
           color: newBudget.color,
-          ...(newBudget.period === 'custom' && {
+          ...((newBudget.period as string) === 'custom' && {
             cycleStart: newBudget.cycleStart,
             cycleLength: newBudget.cycleLength
           })
@@ -175,9 +175,9 @@ const BudgetPage: React.FC = () => {
           category: newBudget.category,
           name: newBudget.name || newBudget.category,
           amount: newBudget.amount,
-          period: newBudget.period,
+          period: newBudget.period as Budget['period'],
           color: newBudget.color,
-          ...(newBudget.period === 'custom' && {
+          ...((newBudget.period as string) === 'custom' && {
             cycleStart: newBudget.cycleStart,
             cycleLength: newBudget.cycleLength
           })
@@ -660,7 +660,7 @@ const BudgetPage: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-              {newBudget.period === 'custom' && (
+              {(newBudget.period as string) === 'custom' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="cycleStart">Cycle Start Date</Label>
