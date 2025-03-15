@@ -1,5 +1,3 @@
-
-// Modifying FinanceContext.tsx to fix the TypeScript errors
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTransactionManager } from './useTransactionManager';
 import { useAuthManager } from './useAuthManager';
@@ -36,18 +34,35 @@ interface FinanceContextProps {
   clearData: () => void;
   refreshData: () => Promise<void>;
   exportData: () => string;
+  twoFactorEnabled: boolean;
+  twoFactorSecret: string;
+  twoFactorQRCode: string;
+  generateTwoFactorSecret: () => Promise<void>;
+  enableTwoFactor: () => Promise<void>;
+  disableTwoFactor: () => Promise<void>;
+  verifyTwoFactorCode: (code: string) => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceContextProps | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const auth = useAuthManager();
   const { 
     user, 
     isAuthLoading, 
     signIn, 
     signUp, 
     logout 
-  } = useAuthManager();
+  } = auth;
+  const { 
+    twoFactorEnabled, 
+    twoFactorSecret, 
+    twoFactorQRCode, 
+    generateTwoFactorSecret,
+    enableTwoFactor,
+    disableTwoFactor,
+    verifyTwoFactorCode 
+  } = auth;
   
   const {
     transactions,
@@ -69,46 +84,53 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     addBudget,
     updateBudget,
     deleteBudget,
-  } = useBudgetManager(user, transactions); // Adding transactions as the second parameter
+  } = useBudgetManager(user, transactions);
   
   const {
     themeMode,
     setThemeMode
   } = useThemeManager();
 
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    loading: isLoading || isAuthLoading,
+    isAuthLoading,
+    login: signIn,
+    signIn,
+    signup: signUp,
+    signUp,
+    loginWithGoogle: () => Promise.resolve(),
+    logout,
+    transactions,
+    stats,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    importXLS,
+    fetchTransactionsFromFirebase,
+    isLoading,
+    budgets,
+    budgetSummaries,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    themeMode,
+    setThemeMode,
+    clearData,
+    refreshData,
+    exportData,
+    twoFactorEnabled,
+    twoFactorSecret,
+    twoFactorQRCode,
+    generateTwoFactorSecret,
+    enableTwoFactor,
+    disableTwoFactor,
+    verifyTwoFactorCode
+  };
+
   return (
-    <FinanceContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        loading: isLoading || isAuthLoading,
-        isAuthLoading,
-        login: signIn,
-        signIn,
-        signup: signUp,
-        signUp,
-        loginWithGoogle: () => Promise.resolve(), // Placeholder for now
-        logout,
-        transactions,
-        stats,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        importXLS,
-        fetchTransactionsFromFirebase,
-        isLoading,
-        budgets,
-        budgetSummaries,
-        addBudget,
-        updateBudget,
-        deleteBudget,
-        themeMode,
-        setThemeMode,
-        clearData,
-        refreshData,
-        exportData
-      }}
-    >
+    <FinanceContext.Provider value={value}>
       {children}
     </FinanceContext.Provider>
   );
