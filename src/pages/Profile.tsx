@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useFinance } from '@/contexts/FinanceContext';
 import { Button } from '@/components/ui/button';
@@ -28,12 +27,10 @@ export default function Profile() {
   const [disableCode, setDisableCode] = useState('');
   const isMobile = useIsMobile();
 
-  // Since this is a demo, we're not actually updating the profile
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
     setIsUpdating(true);
     
-    // Simulate API request
     setTimeout(() => {
       setIsUpdating(false);
       
@@ -47,7 +44,7 @@ export default function Profile() {
   const handleSetupTwoFactor = async () => {
     try {
       const result = await generateTwoFactorSecret();
-      if (result) {
+      if (result && result.qrCode) {
         setQrCodeUrl(result.qrCode);
         setTwoFactorSecret(result.secret);
         setShowTwoFactorSetup(true);

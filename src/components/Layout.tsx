@@ -21,9 +21,12 @@ import {
   Sun,
   Laptop,
   HelpCircle,
-  Tag
+  Tag,
+  Globe
 } from 'lucide-react';
 import { useFinance } from '@/contexts/FinanceContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Language, languages } from '@/locales';
 import { toast } from '@/components/ui/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -81,39 +84,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, themeMode, setThemeMode } = useFinance();
+  const { language, setLanguage, t } = useLanguage();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const navigationItems = [
     {
       icon: <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Dashboard",
+      label: t('navigation.dashboard'),
       to: "/",
     },
     {
       icon: <ListFilter className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Transactions",
+      label: t('navigation.transactions'),
       to: "/transactions",
       count: 12,
     },
     {
       icon: <PieChart className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Budget",
+      label: t('navigation.budget'),
       to: "/budget",
     },
     {
       icon: <LineChart className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Reports",
+      label: t('navigation.reports'),
       to: "/reports",
     },
     {
       icon: <Tag className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Categories",
+      label: t('navigation.categories'),
       to: "/categories",
     },
     {
       icon: <Upload className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Import",
+      label: t('navigation.import'),
       to: "/import",
     },
   ];
@@ -121,12 +125,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const bottomItems = [
     {
       icon: <User className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Profile",
+      label: t('navigation.profile'),
       to: "/profile",
     },
     {
       icon: <Settings className="h-4 w-4 sm:h-5 sm:w-5" />,
-      label: "Settings",
+      label: t('navigation.settings'),
       to: "/settings",
     },
   ];
@@ -135,15 +139,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     try {
       await logout();
       toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account.",
+        title: t('auth.logoutSuccess'),
+        description: t('auth.logoutSuccessDescription'),
       });
       navigate('/auth');
     } catch (error) {
       console.error('Logout error:', error);
       toast({
-        title: "Logout failed",
-        description: "There was an error logging out. Please try again.",
+        title: t('auth.logoutError'),
+        description: t('auth.logoutErrorDescription'),
         variant: "destructive",
       });
     }
@@ -160,38 +164,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       setIsCollapsed(savedState === 'true');
     }
     
-    // Close mobile menu when route changes
     setIsMobileMenuOpen(false);
     
-    // Auto-collapse sidebar on small screens
     const handleResize = () => {
       if (window.innerWidth < 768) {
         setIsCollapsed(true);
       }
     };
     
-    handleResize(); // Run once on initial load
+    handleResize();
     window.addEventListener('resize', handleResize);
     
     return () => window.removeEventListener('resize', handleResize);
   }, [location.pathname]);
 
+  const handleLanguageChange = (value: Language) => {
+    setLanguage(value);
+  };
+
   const MobileThemeSwitcher = () => (
     <>
       <DropdownMenuItem disabled className="opacity-70 text-xs sm:text-sm">
-        Theme
+        {t('settings.theme')}
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
         <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        Light {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        {t('settings.light')} {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
         <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        Dark {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        {t('settings.dark')} {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
       <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
         <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-        System {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+        {t('settings.system')} {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
       </DropdownMenuItem>
     </>
   );
@@ -203,7 +209,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex justify-between items-center w-full">
             <div className="flex items-center gap-2">
               <CreditCard className="h-5 w-5 text-primary" />
-              <h1 className="font-semibold text-sm">Finance Tracker</h1>
+              <h1 className="font-semibold text-sm">{t('general.appName')}</h1>
             </div>
             
             <div className="flex items-center gap-2">
@@ -221,25 +227,40 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       </div>
                       <div className="flex flex-col space-y-0.5">
                         <p className="text-xs sm:text-sm font-medium">{user.email}</p>
-                        <p className="text-xs text-muted-foreground">User Account</p>
+                        <p className="text-xs text-muted-foreground">{t('settings.personalAccount')}</p>
                       </div>
                     </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate('/profile')} className="text-xs sm:text-sm">
                       <User className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Profile</span>
+                      <span>{t('navigation.profile')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate('/settings')} className="text-xs sm:text-sm">
                       <Settings className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Settings</span>
+                      <span>{t('navigation.settings')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="text-xs sm:text-sm">
                       <LogOut className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>Logout</span>
+                      <span>{t('navigation.logout')}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <MobileThemeSwitcher />
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem disabled className="opacity-70 text-xs sm:text-sm">
+                      {t('settings.language')}
+                    </DropdownMenuItem>
+                    {Object.entries(languages).map(([code, lang]) => (
+                      <DropdownMenuItem 
+                        key={code} 
+                        onClick={() => handleLanguageChange(code as Language)} 
+                        className="text-xs sm:text-sm"
+                      >
+                        <Globe className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                        <span>{lang.nativeName}</span>
+                        {language === code && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                      </DropdownMenuItem>
+                    ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
@@ -297,7 +318,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span>Logout</span>
+                    <span>{t('navigation.logout')}</span>
                   </Button>
                 </>
               ) : (
@@ -307,13 +328,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     className="w-full justify-start gap-2 sm:gap-3 p-2 sm:p-3 font-normal mt-4 border-t pt-4 text-sm"
                   >
                     <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                    <span>Login / Sign Up</span>
+                    <span>{t('auth.login')}</span>
                   </Button>
                 </Link>
               )}
               
               <div className="mt-6 p-2 bg-accent/50 rounded-lg">
-                <p className="text-xs font-medium mb-2">Theme</p>
+                <p className="text-xs font-medium mb-2">{t('settings.theme')}</p>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
@@ -322,7 +343,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("light")}
                   >
                     <Sun className="h-3 w-3 mr-1" />
-                    Light
+                    {t('settings.light')}
                   </Button>
                   <Button 
                     variant="outline" 
@@ -331,7 +352,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("dark")}
                   >
                     <Moon className="h-3 w-3 mr-1" />
-                    Dark
+                    {t('settings.dark')}
                   </Button>
                   <Button 
                     variant="outline" 
@@ -340,7 +361,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     onClick={() => setThemeMode("system")}
                   >
                     <Laptop className="h-3 w-3 mr-1" />
-                    System
+                    {t('settings.system')}
                   </Button>
                 </div>
               </div>
@@ -362,7 +383,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <>
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <h1 className="font-semibold text-base sm:text-lg">Finance App</h1>
+                  <h1 className="font-semibold text-base sm:text-lg">{t('general.appName')}</h1>
                 </div>
               </>
             )}
@@ -413,7 +434,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-                {!isCollapsed && <span>Logout</span>}
+                {!isCollapsed && <span>{t('navigation.logout')}</span>}
               </Button>
             ) : (
               <Link to="/auth">
@@ -425,14 +446,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   )}
                 >
                   <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                  {!isCollapsed && <span>Login</span>}
+                  {!isCollapsed && <span>{t('auth.login')}</span>}
                 </Button>
               </Link>
             )}
             
             {!isCollapsed && (
               <div className="border-t mt-4 mb-4 pt-4 px-2">
-                <p className="mb-2 text-xs sm:text-sm font-medium">Theme</p>
+                <p className="mb-2 text-xs sm:text-sm font-medium">{t('settings.theme')}</p>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
@@ -482,17 +503,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <DropdownMenuContent side="right">
                   <DropdownMenuItem onClick={() => setThemeMode("light")} className="text-xs sm:text-sm">
                     <Sun className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Light</span>
+                    <span>{t('settings.light')}</span>
                     {themeMode === "light" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setThemeMode("dark")} className="text-xs sm:text-sm">
                     <Moon className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>Dark</span>
+                    <span>{t('settings.dark')}</span>
                     {themeMode === "dark" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setThemeMode("system")} className="text-xs sm:text-sm">
                     <Laptop className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    <span>System</span>
+                    <span>{t('settings.system')}</span>
                     {themeMode === "system" && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -501,32 +522,47 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             
             {!isCollapsed && (
               <div className="border-t mt-4 mb-4 pt-4 px-2">
-                <p className="mb-2 text-xs sm:text-sm font-medium">Language</p>
-                <Select defaultValue="en">
+                <p className="mb-2 text-xs sm:text-sm font-medium">{t('settings.language')}</p>
+                <Select value={language} onValueChange={(value) => handleLanguageChange(value as Language)}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select Language" />
+                    <SelectValue placeholder={t('settings.selectLanguage')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="sq">Albanian</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
+                    {Object.entries(languages).map(([code, lang]) => (
+                      <SelectItem key={code} value={code as Language}>
+                        {lang.nativeName}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
             
-            {/* <div className="mt-4 flex justify-center">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="opacity-60 hover:opacity-100 h-7 w-7 sm:h-8 sm:w-8">
-                      <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Help & Support</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div> */}
+            {isCollapsed && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="w-full justify-center p-2 sm:p-3 mt-1 h-8 w-8 sm:h-10 sm:w-10"
+                  >
+                    <Globe className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="right">
+                  {Object.entries(languages).map(([code, lang]) => (
+                    <DropdownMenuItem 
+                      key={code} 
+                      onClick={() => handleLanguageChange(code as Language)} 
+                      className="text-xs sm:text-sm"
+                    >
+                      <span>{lang.nativeName}</span>
+                      {language === code && <Check className="ml-auto h-3 w-3 sm:h-4 sm:w-4" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </aside>
         

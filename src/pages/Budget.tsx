@@ -39,6 +39,8 @@ type ExtendedBudget = Omit<Budget, 'id'> & {
   cycleLength?: number
 }
 
+type PeriodType = 'weekly' | 'monthly' | 'yearly' | 'custom';
+
 const BudgetPage: React.FC = () => {
   const { budgets, budgetSummaries, transactions, addBudget, deleteBudget, updateBudget } = useFinance()
   const [newBudget, setNewBudget] = useState<ExtendedBudget>({

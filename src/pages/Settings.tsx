@@ -156,7 +156,7 @@ const Settings = () => {
     
     toast({
       title: t('settings.settingsUpdated'),
-      description: `${t(`settings.${type.toLowerCase()}Updated`)}`
+      description: t(`settings.${type.toLowerCase()}Updated`)
     });
   };
   
@@ -309,8 +309,8 @@ const Settings = () => {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="compact-mode">Compact Mode</Label>
-                      <p className="text-sm text-muted-foreground">Reduces spacing and sizes</p>
+                      <Label htmlFor="compact-mode">{t('settings.compactMode')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.compactModeDescription')}</p>
                     </div>
                     <Switch 
                       id="compact-mode" 
@@ -321,8 +321,8 @@ const Settings = () => {
                   
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="animations">Enable Animations</Label>
-                      <p className="text-sm text-muted-foreground">Show animations throughout the app</p>
+                      <Label htmlFor="animations">{t('settings.animations')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.animationsDescription')}</p>
                     </div>
                     <Switch 
                       id="animations" 
@@ -333,8 +333,8 @@ const Settings = () => {
                   
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="contrast">High Contrast Mode</Label>
-                      <p className="text-sm text-muted-foreground">Increases contrast for better visibility</p>
+                      <Label htmlFor="contrast">{t('settings.highContrast')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.highContrastDescription')}</p>
                     </div>
                     <Switch 
                       id="contrast" 
@@ -345,20 +345,20 @@ const Settings = () => {
                   
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="fontsize">Font Size</Label>
-                      <p className="text-sm text-muted-foreground">Change the text size throughout the app</p>
+                      <Label htmlFor="fontsize">{t('settings.fontSize')}</Label>
+                      <p className="text-sm text-muted-foreground">{t('settings.fontSizeDescription')}</p>
                     </div>
                     <Select 
                       value={appearance.fontsize}
                       onValueChange={(value) => setAppearance({...appearance, fontsize: value})}
                     >
                       <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Select size" />
+                        <SelectValue placeholder={t('settings.selectFontSize')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="small">Small</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="large">Large</SelectItem>
+                        <SelectItem value="small">{t('settings.small')}</SelectItem>
+                        <SelectItem value="medium">{t('settings.medium')}</SelectItem>
+                        <SelectItem value="large">{t('settings.large')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -368,11 +368,11 @@ const Settings = () => {
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={handleResetSettings}>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Reset to Defaults
+                  {t('settings.resetToDefaults')}
                 </Button>
                 <Button onClick={() => handleUpdateSettings('Appearance')}>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                  {t('settings.saveChanges')}
                 </Button>
               </div>
             </CardContent>
@@ -532,11 +532,11 @@ const Settings = () => {
                   });
                 }}>
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Clear All Fields
+                  {t('settings.clearAllFields')}
                 </Button>
                 <Button onClick={handleSaveFirebaseConfig}>
                   <Save className="mr-2 h-4 w-4" />
-                  Save Configuration
+                  {t('settings.saveConfiguration')}
                 </Button>
               </div>
             </CardContent>

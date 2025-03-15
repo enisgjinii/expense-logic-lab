@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface DashboardFiltersProps {
   timeRange: string;
@@ -14,6 +15,8 @@ const DashboardFilters: React.FC<DashboardFiltersProps> = ({
   isRefreshing,
   handleRefresh
 }) => {
+  const { t } = useLanguage();
+  
   return (
     <div className="flex space-x-2 items-center">
       <div className="bg-card rounded-lg p-1 shadow-sm">
@@ -21,19 +24,19 @@ const DashboardFilters: React.FC<DashboardFiltersProps> = ({
           onClick={() => setTimeRange('month')}
           className={`px-3 py-1 rounded-md text-sm ${timeRange === 'month' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
         >
-          Month
+          {t('dashboard.month')}
         </button>
         <button 
           onClick={() => setTimeRange('quarter')}
           className={`px-3 py-1 rounded-md text-sm ${timeRange === 'quarter' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
         >
-          Quarter
+          {t('dashboard.quarter')}
         </button>
         <button 
           onClick={() => setTimeRange('year')}
           className={`px-3 py-1 rounded-md text-sm ${timeRange === 'year' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
         >
-          Year
+          {t('dashboard.year')}
         </button>
       </div>
       

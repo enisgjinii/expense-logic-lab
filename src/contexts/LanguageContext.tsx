@@ -5,7 +5,7 @@ import { Language, translations, TranslationsType } from '@/locales';
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, variables?: Record<string, string | number>) => string;
 }
 
 const defaultLanguage: Language = 'en';
@@ -27,8 +27,8 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     setLanguageState(lang);
   };
 
-  // Translation function
-  const t = (key: string): string => {
+  // Enhanced translation function with variable support
+  const t = (key: string, variables?: Record<string, string | number>): string => {
     const keys = key.split('.');
     let value: any = translations[language];
 
@@ -39,6 +39,15 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
         console.warn(`Translation key not found: ${key}`);
         return key;
       }
+    }
+
+    // If we have variables, replace them in the string
+    if (variables && typeof value === 'string') {
+      return value.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+        return variables[variable] !== undefined 
+          ? String(variables[variable]) 
+          : match;
+      });
     }
 
     return value || key;
