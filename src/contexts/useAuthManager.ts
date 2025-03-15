@@ -48,8 +48,8 @@ export const useAuthManager = () => {
   };
 
   // Generate a new 2FA secret
-  const generateTwoFactorSecret = async () => {
-    if (!user) return;
+  const generateTwoFactorSecret = async (): Promise<{ secret: string; qrCode: string; } | undefined> => {
+    if (!user) return undefined;
     
     try {
       // In a real app, this would be a server-side call to generate a proper TOTP secret
@@ -77,7 +77,7 @@ export const useAuthManager = () => {
   };
 
   // Enable 2FA for the user
-  const enableTwoFactor = async (verificationCode: string) => {
+  const enableTwoFactor = async (verificationCode: string): Promise<boolean> => {
     if (!user || !twoFactorSecret) return false;
     
     try {
@@ -115,7 +115,7 @@ export const useAuthManager = () => {
   };
 
   // Disable 2FA for the user
-  const disableTwoFactor = async (verificationCode: string) => {
+  const disableTwoFactor = async (verificationCode: string): Promise<boolean> => {
     if (!user) return false;
     
     try {
@@ -155,7 +155,7 @@ export const useAuthManager = () => {
   };
 
   // Verify a 2FA code (for sign-in)
-  const verifyTwoFactorCode = async (code: string) => {
+  const verifyTwoFactorCode = async (code: string): Promise<boolean> => {
     if (!user || !twoFactorSecret) return false;
     
     try {

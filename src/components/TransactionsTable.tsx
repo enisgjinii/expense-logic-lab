@@ -13,19 +13,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import DateRangePicker from '@/components/DateRangePicker'
 import { DateRange } from 'react-day-picker'
 import { parseISO, format as formatFns, differenceInDays } from 'date-fns'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, TooltipProps } from 'recharts'
 import { motion } from 'framer-motion'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
-function TransactionForm({ transaction, onSuccess }) {
+interface TransactionFormProps {
+  transaction?: Transaction;
+  onSuccess: () => void;
+}
+
+function TransactionForm({ transaction, onSuccess }: TransactionFormProps) {
   const { addTransaction, updateTransaction } = useFinance()
   const [formData, setFormData] = useState({
     date: new Date().toISOString(),
     account: '',
     category: '',
     amount: 0,
-    type: 'Expense',
-    payment_type: 'CASH',
+    type: 'Expense' as 'Income' | 'Expense' | 'Transfer',
+    payment_type: 'CASH' as 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER',
     notes: '',
     description: '',
     currency: 'USD'
@@ -47,7 +52,7 @@ function TransactionForm({ transaction, onSuccess }) {
     }
   }, [transaction])
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     try {
       if (transaction) await updateTransaction({ ...transaction, ...formData })
@@ -62,12 +67,12 @@ function TransactionForm({ transaction, onSuccess }) {
     }
   }
 
-  function handleChange(e) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: name === 'amount' ? Number(value) || 0 : value }))
   }
 
-  function handleDateChange(e) {
+  function handleDateChange(e: React.ChangeEvent<HTMLInputElement>) {
     try {
       const selectedDate = new Date(e.target.value)
       setFormData(prev => ({ ...prev, date: selectedDate.toISOString() }))
@@ -77,12 +82,12 @@ function TransactionForm({ transaction, onSuccess }) {
     }
   }
 
-  function handleTypeChange(e) {
-    setFormData(prev => ({ ...prev, type: e.target.value }))
+  function handleTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setFormData(prev => ({ ...prev, type: e.target.value as 'Income' | 'Expense' | 'Transfer' }))
   }
 
-  function handlePaymentTypeChange(e) {
-    setFormData(prev => ({ ...prev, payment_type: e.target.value }))
+  function handlePaymentTypeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    setFormData(prev => ({ ...prev, payment_type: e.target.value as 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER' }))
   }
 
   return (
@@ -139,7 +144,7 @@ function TransactionForm({ transaction, onSuccess }) {
   )
 }
 
-function PaymentTypeIcon({ type }) {
+function PaymentTypeIcon({ type }: { type: string }) {
   switch (type) {
     case 'CREDIT_CARD':
     case 'DEBIT_CARD':
@@ -153,8 +158,8 @@ function PaymentTypeIcon({ type }) {
   }
 }
 
-function detectDuplicateTransactions(transactions) {
-  const groups = {}
+function detectDuplicateTransactions(transactions: Transaction[]) {
+  const groups: Record<string, Transaction[]> = {}
   transactions.forEach(tx => {
     const date = new Date(tx.date).toISOString().slice(0, 10)
     const key = `${date}-${tx.account.trim().toLowerCase()}-${tx.category.trim().toLowerCase()}-${tx.amount.toFixed(2)}`
@@ -163,7 +168,7 @@ function detectDuplicateTransactions(transactions) {
   return Object.values(groups).filter(group => group.length > 1)
 }
 
-function DuplicateTransactionsAlert({ transactions }) {
+function DuplicateTransactionsAlert({ transactions }: { transactions: Transaction[] }) {
   const duplicateGroups = useMemo(() => detectDuplicateTransactions(transactions), [transactions])
   if (!duplicateGroups.length) return null
   return (
@@ -388,23 +393,23 @@ function SpendingTrends({ transactions }) {
   )
 }
 
-export default function TransactionsTable({ transactions }) {
+export default function TransactionsTable({ transactions }: { transactions: Transaction[] }) {
   const { deleteTransaction } = useFinance()
   const [openCreateModal, setOpenCreateModal] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [typeFilter, setTypeFilter] = useState(null)
-  const [paymentFilter, setPaymentFilter] = useState(null)
-  const [accountFilter, setAccountFilter] = useState(null)
-  const [dateRange, setDateRange] = useState()
+  const [typeFilter, setTypeFilter] = useState<'Income' | 'Expense' | 'Transfer' | null>(null)
+  const [paymentFilter, setPaymentFilter] = useState<'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'TRANSFER' | null>(null)
+  const [accountFilter, setAccountFilter] = useState<string | null>(null)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [sortBy, setSortBy] = useState('date')
   const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [expandedRows, setExpandedRows] = useState(new Set())
-  const [selectedTx, setSelectedTx] = useState(null)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
 
   const allAccounts = useMemo(() => {
     const setAcc = new Set()
@@ -574,6 +579,11 @@ export default function TransactionsTable({ transactions }) {
     return result
   }, [filteredTransactions])
 
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <Tabs defaultValue="transactions">
@@ -603,7 +613,7 @@ export default function TransactionsTable({ transactions }) {
                       className="pl-8 h-9 text-sm"
                     />
                   </div>
-                  <DateRangePicker dateRange={dateRange} onDateRangeChange={range => { setDateRange(range); setCurrentPage(1) }} />
+                  <DateRangePicker dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="h-9 gap-1 w-full sm:w-auto justify-center text-sm">
@@ -922,3 +932,4 @@ export default function TransactionsTable({ transactions }) {
     </div>
   )
 }
+

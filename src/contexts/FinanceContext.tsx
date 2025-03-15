@@ -37,10 +37,10 @@ interface FinanceContextProps {
   twoFactorEnabled: boolean;
   twoFactorSecret: string;
   twoFactorQRCode: string;
-  generateTwoFactorSecret: () => Promise<void>;
-  enableTwoFactor: () => Promise<void>;
-  disableTwoFactor: () => Promise<void>;
-  verifyTwoFactorCode: (code: string) => Promise<void>;
+  generateTwoFactorSecret: () => Promise<{ secret: string; qrCode: string; } | undefined>;
+  enableTwoFactor: (code: string) => Promise<boolean>;
+  disableTwoFactor: (code: string) => Promise<boolean>;
+  verifyTwoFactorCode: (code: string) => Promise<boolean>;
 }
 
 const FinanceContext = createContext<FinanceContextProps | undefined>(undefined);
